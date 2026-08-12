@@ -2,6 +2,10 @@
 
 A portfolio-ready bus booking application with a Django REST API and a separate React frontend. Customers can search trips, hold seats safely, confirm mock payments, and print QR tickets. Operators manage only their own fleet and schedules, while administrators see system-wide booking analytics.
 
+## Author
+
+Built by [Arman](https://github.com/armancore). View more of my work on [GitHub](https://github.com/armancore).
+
 ## Highlights
 
 - PostgreSQL-backed, concurrency-safe 10-minute seat holds
