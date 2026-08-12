@@ -6,7 +6,7 @@ A portfolio project with a Django REST API and a separate React frontend. The sy
 
 ```text
 backend/   Django 5 + Django REST Framework API
-frontend/  React + Vite application (added in a later phase)
+frontend/  React + Vite application
 ```
 
 ## Implemented backend foundation
@@ -96,6 +96,24 @@ Bus seat maps are stored as data, not frontend code. Each deck describes its gri
 ```
 
 The backend validates that every seat has a unique code. Creating a trip copies those codes into fixed `TripSeat` rows, which will later hold the live availability state.
+
+## Run the frontend
+
+Keep the Django server running, then open a second PowerShell window from the project root:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. The Vite development server forwards `/api` requests to Django at `http://127.0.0.1:8000`.
+
+The public search API accepts exact city names and a local travel date:
+
+```text
+GET /api/trips/?origin=Kathmandu&destination=Pokhara&date=2026-08-13
+```
 
 ## Data model overview
 

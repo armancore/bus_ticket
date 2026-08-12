@@ -4,7 +4,10 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from .models import Bus, Route, Trip, TripSeat
 
@@ -86,3 +89,83 @@ class TransportModelTests(TestCase):
 
         with self.assertRaises(ValidationError):
             bus.full_clean()
+
+
+class PublicTripAPITests(APITestCase):
+    def setUp(self):
+        operator = User.objects.create_user(
+            username="api_operator",
+            password="StrongPass123!",
+            role=User.Role.OPERATOR,
+        )
+        bus = Bus.objects.create(
+            operator=operator,
+            name="API Express",
+            plate_number="BA-API-1",
+            bus_type="AC Deluxe",
+            layout=SIMPLE_LAYOUT,
+        )
+        kathmandu_to_pokhara = Route.objects.create(
+            origin="Kathmandu",
+            destination="Pokhara",
+            distance=Decimal("200.00"),
+            estimated_duration=timedelta(hours=7),
+        )
+        kathmandu_to_chitwan = Route.objects.create(
+            origin="Kathmandu",
+            destination="Chitwan",
+            distance=Decimal("150.00"),
+            estimated_duration=timedelta(hours=5),
+        )
+        departure = timezone.now() + timedelta(days=2)
+        self.trip = Trip.objects.create(
+            bus=bus,
+            route=kathmandu_to_pokhara,
+            departure_datetime=departure,
+            arrival_datetime=departure + timedelta(hours=7),
+            base_fare=Decimal("1200.00"),
+        )
+        Trip.objects.create(
+            bus=bus,
+            route=kathmandu_to_chitwan,
+            departure_datetime=departure,
+            arrival_datetime=departure + timedelta(hours=5),
+            base_fare=Decimal("900.00"),
+        )
+
+    def test_anonymous_user_can_list_routes(self):
+        response = self.client.get(reverse("route-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_trip_search_filters_origin_destination_and_date(self):
+        local_date = timezone.localtime(self.trip.departure_datetime).date().isoformat()
+        response = self.client.get(
+            reverse("trip-list"),
+            {
+                "origin": "Kathmandu",
+                "destination": "Pokhara",
+                "date": local_date,
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], self.trip.id)
+
+    def test_cancelled_trip_is_not_returned_in_search(self):
+        self.trip.status = Trip.Status.CANCELLED
+        self.trip.save(update_fields=["status"])
+
+        response = self.client.get(reverse("trip-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_anonymous_user_can_view_trip_detail(self):
+        response = self.client.get(reverse("trip-detail", args=[self.trip.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["bus"]["name"], "API Express")
+        self.assertIn("bus_layout", response.data)
