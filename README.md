@@ -9,7 +9,7 @@ backend/   Django 5 + Django REST Framework API
 frontend/  React + Vite application (added in a later phase)
 ```
 
-## Phase 1: backend authentication setup
+## Implemented backend foundation
 
 ### Requirements
 
@@ -41,6 +41,7 @@ Edit `backend/.env` and set `DB_PASSWORD` to your PostgreSQL password. Then run:
 ```powershell
 cd backend
 python manage.py migrate
+python manage.py seed_data
 python manage.py createsuperuser
 python manage.py runserver
 ```
@@ -60,6 +61,42 @@ Run tests after configuring the PostgreSQL database:
 python manage.py test
 ```
 
+### Demo accounts
+
+Running `seed_data` creates or refreshes these local accounts:
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Customer | `demo_customer` | `Customer@12345` |
+| Operator | `demo_operator` | `Operator@12345` |
+
+The command also creates a demo bus, two routes, two upcoming trips, and an available `TripSeat` row for every seat on each trip. It is safe to run repeatedly.
+
+### Bus layout JSON
+
+Bus seat maps are stored as data, not frontend code. Each deck describes its grid, aisle, and exact seat positions:
+
+```json
+{
+  "decks": [
+    {
+      "name": "LOWER",
+      "rows": 2,
+      "columns": 4,
+      "aisle_after_columns": [2],
+      "seats": [
+        { "code": "A1", "row": 1, "column": 1 },
+        { "code": "A2", "row": 1, "column": 2 },
+        { "code": "A3", "row": 1, "column": 3 },
+        { "code": "A4", "row": 1, "column": 4 }
+      ]
+    }
+  ]
+}
+```
+
+The backend validates that every seat has a unique code. Creating a trip copies those codes into fixed `TripSeat` rows, which will later hold the live availability state.
+
 ## Data model overview
 
-The complete ER diagram will be added as the transport and booking models are introduced. The custom `User` model is created in the first migration so every later foreign key points to the correct user table.
+The complete ER diagram will be added when the booking models are introduced. The custom `User` model was created in the first migration so every later foreign key points to the correct user table.
