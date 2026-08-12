@@ -206,35 +206,37 @@ class OperatorPermissionAPITests(APITestCase):
             password="StrongPass123!",
             role=User.Role.OPERATOR,
         )
-        route = Route.objects.create(
+        self.route = Route.objects.create(
             origin="Kathmandu",
             destination="Pokhara",
             distance=Decimal("200.00"),
             estimated_duration=timedelta(hours=7),
         )
         departure = timezone.now() + timedelta(days=2)
+        self.own_bus = Bus.objects.create(
+            operator=self.operator,
+            name="Owned Bus",
+            plate_number="OWNED-1",
+            bus_type="AC",
+            layout=SIMPLE_LAYOUT,
+        )
+        self.other_bus = Bus.objects.create(
+            operator=self.other_operator,
+            name="Other Bus",
+            plate_number="OTHER-1",
+            bus_type="AC",
+            layout=SIMPLE_LAYOUT,
+        )
         self.own_trip = Trip.objects.create(
-            bus=Bus.objects.create(
-                operator=self.operator,
-                name="Owned Bus",
-                plate_number="OWNED-1",
-                bus_type="AC",
-                layout=SIMPLE_LAYOUT,
-            ),
-            route=route,
+            bus=self.own_bus,
+            route=self.route,
             departure_datetime=departure,
             arrival_datetime=departure + timedelta(hours=7),
             base_fare=Decimal("1000.00"),
         )
         self.other_trip = Trip.objects.create(
-            bus=Bus.objects.create(
-                operator=self.other_operator,
-                name="Other Bus",
-                plate_number="OTHER-1",
-                bus_type="AC",
-                layout=SIMPLE_LAYOUT,
-            ),
-            route=route,
+            bus=self.other_bus,
+            route=self.route,
             departure_datetime=departure,
             arrival_datetime=departure + timedelta(hours=7),
             base_fare=Decimal("1000.00"),
@@ -253,3 +255,96 @@ class OperatorPermissionAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_operator_can_create_bus_and_is_automatically_the_owner(self):
+        response = self.client.post(
+            reverse("operator-bus-list"),
+            {
+                "name": "New Express",
+                "plate_number": "NEW-OP-1",
+                "bus_type": "Deluxe",
+                "layout": SIMPLE_LAYOUT,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        bus = Bus.objects.get(plate_number="NEW-OP-1")
+        self.assertEqual(bus.operator, self.operator)
+        self.assertEqual(response.data["seat_count"], 3)
+
+    def test_operator_cannot_read_update_or_delete_another_operators_bus(self):
+        url = reverse("operator-bus-detail", args=[self.other_bus.id])
+
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            self.client.patch(url, {"name": "Stolen"}).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_operator_can_create_trip_only_for_an_owned_bus(self):
+        departure = timezone.now() + timedelta(days=5)
+        payload = {
+            "bus_id": self.own_bus.id,
+            "route_id": self.route.id,
+            "departure_datetime": departure.isoformat(),
+            "arrival_datetime": (departure + timedelta(hours=7)).isoformat(),
+            "base_fare": "1500.00",
+            "status": Trip.Status.SCHEDULED,
+        }
+
+        response = self.client.post(reverse("operator-trip-list"), payload)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["bus"]["id"], self.own_bus.id)
+        self.assertEqual(Trip.objects.get(id=response.data["id"]).seats.count(), 3)
+
+        payload["bus_id"] = self.other_bus.id
+        forbidden_response = self.client.post(reverse("operator-trip-list"), payload)
+        self.assertEqual(forbidden_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("bus_id", forbidden_response.data)
+
+    def test_operator_cannot_update_or_delete_another_operators_trip(self):
+        url = reverse("operator-trip-detail", args=[self.other_trip.id])
+
+        self.assertEqual(
+            self.client.patch(url, {"status": Trip.Status.CANCELLED}).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_operator_can_update_owned_trip_but_cannot_change_its_bus(self):
+        url = reverse("operator-trip-detail", args=[self.own_trip.id])
+
+        response = self.client.patch(url, {"status": Trip.Status.CANCELLED})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], Trip.Status.CANCELLED)
+
+        other_owned_bus = Bus.objects.create(
+            operator=self.operator,
+            name="Second Owned Bus",
+            plate_number="OWNED-2",
+            bus_type="AC",
+            layout=SIMPLE_LAYOUT,
+        )
+        response = self.client.patch(url, {"bus_id": other_owned_bus.id})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("bus_id", response.data)
+
+    def test_customer_cannot_access_operator_management(self):
+        customer = User.objects.create_user(
+            username="not_an_operator",
+            password="StrongPass123!",
+            role=User.Role.CUSTOMER,
+        )
+        self.client.force_authenticate(customer)
+
+        self.assertEqual(
+            self.client.get(reverse("operator-bus-list")).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.get(reverse("operator-trip-list")).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )

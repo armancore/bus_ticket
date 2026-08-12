@@ -1,11 +1,12 @@
-from rest_framework import generics, permissions
+from django.db.models.deletion import ProtectedError
+from rest_framework import generics, permissions, serializers
 from rest_framework.response import Response
 
 from bookings.services import expire_holds_for_trip
 from bookings.models import BookingSeat
 
 from .filters import TripFilter
-from .models import Route, Trip
+from .models import Bus, Route, Trip
 from .permissions import IsOperator
 from .serializers import (
     RouteSerializer,
@@ -13,6 +14,8 @@ from .serializers import (
     TripDetailSerializer,
     TripListSerializer,
     PassengerManifestSerializer,
+    OperatorBusSerializer,
+    OperatorTripSerializer,
 )
 
 
@@ -58,8 +61,41 @@ class TripSeatMapView(generics.RetrieveAPIView):
         return super().retrieve(request, *args, **kwargs)
 
 
-class OperatorTripListView(generics.ListAPIView):
-    serializer_class = TripListSerializer
+class OperatorBusListCreateView(generics.ListCreateAPIView):
+    serializer_class = OperatorBusSerializer
+    permission_classes = [IsOperator]
+    pagination_class = None
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Bus.objects.none()
+        return Bus.objects.filter(operator=self.request.user)
+
+    def perform_create(self, serializer):
+        # The authenticated operator is always the owner; the client cannot choose it.
+        serializer.save(operator=self.request.user)
+
+
+class OperatorBusDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = OperatorBusSerializer
+    permission_classes = [IsOperator]
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Bus.objects.none()
+        return Bus.objects.filter(operator=self.request.user)
+
+    def perform_destroy(self, instance):
+        try:
+            instance.delete()
+        except ProtectedError as error:
+            raise serializers.ValidationError(
+                {"detail": "Delete this bus's trips before deleting the bus."}
+            ) from error
+
+
+class OperatorTripListView(generics.ListCreateAPIView):
+    serializer_class = OperatorTripSerializer
     permission_classes = [IsOperator]
     pagination_class = None
 
@@ -71,6 +107,26 @@ class OperatorTripListView(generics.ListAPIView):
             .select_related("bus", "bus__operator", "route")
             .order_by("-departure_datetime")
         )
+
+
+class OperatorTripDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = OperatorTripSerializer
+    permission_classes = [IsOperator]
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Trip.objects.none()
+        return Trip.objects.filter(bus__operator=self.request.user).select_related(
+            "bus", "bus__operator", "route"
+        )
+
+    def perform_destroy(self, instance):
+        try:
+            instance.delete()
+        except ProtectedError as error:
+            raise serializers.ValidationError(
+                {"detail": "A trip with booking history cannot be deleted; cancel it instead."}
+            ) from error
 
 
 class OperatorPassengerManifestView(generics.RetrieveAPIView):

@@ -144,10 +144,22 @@ The `BookingSeat` table also has a PostgreSQL partial unique constraint on charg
 ## Role dashboards
 
 - Customers can register at `/signup`, sign in, book seats, and log out.
-- Operators sign in at `/login` and are redirected to `/operator`. Their trip queryset is restricted to buses they own, and each trip exposes a confirmed passenger manifest.
+- Operators sign in at `/login` and are redirected to `/operator`. They can manage their fleet and schedules, and each trip exposes a confirmed passenger manifest.
 - Admin users are redirected to `/admin-dashboard`, which shows all bookings, confirmed revenue, and occupancy. Full model editing remains available in Django admin at `http://127.0.0.1:8000/admin/`.
 
 Public signup always creates a customer. Create trusted operator accounts through Django admin and assign the `OPERATOR` role.
+
+### Operator management endpoints
+
+```text
+GET, POST          /api/operator/buses/
+GET, PATCH, DELETE /api/operator/buses/{id}/
+GET, POST          /api/operator/trips/
+GET, PATCH, DELETE /api/operator/trips/{id}/
+GET                /api/operator/trips/{id}/manifest/
+```
+
+Every operator queryset is filtered by the authenticated owner. Creating a trip generates its `TripSeat` inventory immediately, so its bus cannot be changed afterward. Buses with trips and trips with booking history cannot be deleted until their protected records are handled safely.
 
 ## Customer tickets
 

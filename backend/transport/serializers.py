@@ -21,6 +21,17 @@ class BusSummarySerializer(serializers.ModelSerializer):
         fields = ("id", "name", "plate_number", "bus_type", "operator_name")
 
 
+class OperatorBusSerializer(serializers.ModelSerializer):
+    seat_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Bus
+        fields = ("id", "name", "plate_number", "bus_type", "layout", "seat_count")
+
+    def get_seat_count(self, bus) -> int:
+        return len(bus.seat_codes)
+
+
 class TripListSerializer(serializers.ModelSerializer):
     bus = BusSummarySerializer(read_only=True)
     route = RouteSerializer(read_only=True)
@@ -43,6 +54,47 @@ class TripDetailSerializer(TripListSerializer):
 
     class Meta(TripListSerializer.Meta):
         fields = (*TripListSerializer.Meta.fields, "bus_layout")
+
+
+class OperatorTripSerializer(TripListSerializer):
+    bus_id = serializers.PrimaryKeyRelatedField(
+        source="bus",
+        queryset=Bus.objects.all(),
+        write_only=True,
+    )
+    route_id = serializers.PrimaryKeyRelatedField(
+        source="route",
+        queryset=Route.objects.all(),
+        write_only=True,
+    )
+
+    class Meta(TripListSerializer.Meta):
+        fields = (*TripListSerializer.Meta.fields, "bus_id", "route_id")
+
+    def validate_bus_id(self, bus):
+        request = self.context["request"]
+        if bus.operator_id != request.user.id:
+            raise serializers.ValidationError("Choose one of your own buses.")
+        if self.instance and self.instance.bus_id != bus.id:
+            raise serializers.ValidationError(
+                "A trip's bus cannot be changed after its seat inventory is created."
+            )
+        return bus
+
+    def validate(self, attrs):
+        departure = attrs.get(
+            "departure_datetime",
+            getattr(self.instance, "departure_datetime", None),
+        )
+        arrival = attrs.get(
+            "arrival_datetime",
+            getattr(self.instance, "arrival_datetime", None),
+        )
+        if departure and arrival and arrival <= departure:
+            raise serializers.ValidationError(
+                {"arrival_datetime": "Arrival must be after departure."}
+            )
+        return attrs
 
 
 class TripSeatSerializer(serializers.ModelSerializer):
