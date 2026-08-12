@@ -110,6 +110,10 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Bus Ticket API",
     "DESCRIPTION": "API for customers, bus operators, and administrators.",
     "VERSION": "1.0.0",
+    "ENUM_NAME_OVERRIDES": {
+        "TripStatusEnum": "transport.models.Trip.Status",
+        "TripSeatStatusEnum": "transport.models.TripSeat.Status",
+    },
 }
 
 CORS_ALLOWED_ORIGINS = env.list(

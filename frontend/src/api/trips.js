@@ -14,3 +14,8 @@ export async function getTrip(tripId) {
   const response = await apiClient.get(`/trips/${tripId}/`)
   return response.data
 }
+
+export async function getTripSeatMap(tripId) {
+  const response = await apiClient.get(`/trips/${tripId}/seats/`)
+  return response.data
+}

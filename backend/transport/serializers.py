@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
-from .models import Bus, Route, Trip
+from datetime import datetime
+
+from django.utils import timezone
+
+from .models import Bus, Route, Trip, TripSeat
 
 
 class RouteSerializer(serializers.ModelSerializer):
@@ -39,3 +43,28 @@ class TripDetailSerializer(TripListSerializer):
 
     class Meta(TripListSerializer.Meta):
         fields = (*TripListSerializer.Meta.fields, "bus_layout")
+
+
+class TripSeatSerializer(serializers.ModelSerializer):
+    effective_fare = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+    )
+
+    class Meta:
+        model = TripSeat
+        fields = ("id", "seat_code", "status", "effective_fare")
+
+
+class SeatMapSerializer(serializers.ModelSerializer):
+    layout = serializers.JSONField(source="bus.layout", read_only=True)
+    seats = TripSeatSerializer(many=True, read_only=True)
+    refreshed_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Trip
+        fields = ("id", "status", "layout", "seats", "refreshed_at")
+
+    def get_refreshed_at(self, _trip) -> datetime:
+        return timezone.now()

@@ -2,12 +2,18 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BusFront, CalendarDays, Clock3, MapPin } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 
-import { getTrip } from '../api/trips.js'
+import { getTrip, getTripSeatMap } from '../api/trips.js'
+import { SeatMap } from '../components/SeatMap.jsx'
 import { formatCurrency, formatDateHeading, formatTime } from '../utils/formatters.js'
 
 export function TripDetailsPage() {
   const { tripId } = useParams()
   const tripQuery = useQuery({ queryKey: ['trip', tripId], queryFn: () => getTrip(tripId) })
+  const seatMapQuery = useQuery({
+    queryKey: ['trip-seat-map', tripId],
+    queryFn: () => getTripSeatMap(tripId),
+    refetchInterval: 15_000,
+  })
 
   if (tripQuery.isPending) {
     return <main className="mx-auto max-w-5xl px-5 py-16 sm:px-8"><p>Loading trip…</p></main>
@@ -54,14 +60,15 @@ export function TripDetailsPage() {
         </dl>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-stone-300 pt-7">
-        <p className="max-w-lg text-sm leading-6 text-stone-500">
-          Seat selection and live availability are added in the next project phase.
-        </p>
-        <button type="button" disabled className="cursor-not-allowed rounded-full bg-stone-300 px-6 py-3 font-bold text-stone-500">
-          Choose seats
-        </button>
-      </div>
+      {seatMapQuery.isPending && <SeatMapLoading />}
+      {seatMapQuery.isError && <SeatMapError onRetry={() => seatMapQuery.refetch()} />}
+      {seatMapQuery.data && (
+        <SeatMap
+          layout={seatMapQuery.data.layout}
+          seats={seatMapQuery.data.seats}
+          refreshedAt={seatMapQuery.data.refreshed_at}
+        />
+      )}
     </main>
   )
 }
@@ -82,5 +89,19 @@ function Detail({ icon: Icon, label, value }) {
       <Icon size={18} className="mt-0.5 text-moss" aria-hidden="true" />
       <div><dt className="text-xs font-bold tracking-wider text-stone-400 uppercase">{label}</dt><dd className="mt-1 font-semibold">{value}</dd></div>
     </div>
+  )
+}
+
+function SeatMapLoading() {
+  return <div className="h-96 animate-pulse border-t border-stone-300 bg-stone-100" role="status"><span className="sr-only">Loading seat map</span></div>
+}
+
+function SeatMapError({ onRetry }) {
+  return (
+    <section className="border-t border-stone-300 py-10" role="alert">
+      <h2 className="font-display text-3xl">Seat map unavailable</h2>
+      <p className="mt-2 text-sm text-stone-500">The trip loaded, but live seat availability did not.</p>
+      <button type="button" onClick={onRetry} className="mt-4 font-bold text-signal underline underline-offset-4">Try again</button>
+    </section>
   )
 }

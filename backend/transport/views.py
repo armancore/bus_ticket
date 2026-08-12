@@ -2,7 +2,12 @@ from rest_framework import generics, permissions
 
 from .filters import TripFilter
 from .models import Route, Trip
-from .serializers import RouteSerializer, TripDetailSerializer, TripListSerializer
+from .serializers import (
+    RouteSerializer,
+    SeatMapSerializer,
+    TripDetailSerializer,
+    TripListSerializer,
+)
 
 
 class RouteListView(generics.ListAPIView):
@@ -31,3 +36,12 @@ class TripDetailView(generics.RetrieveAPIView):
     serializer_class = TripDetailSerializer
     permission_classes = [permissions.AllowAny]
     queryset = Trip.objects.select_related("bus", "bus__operator", "route")
+
+
+class TripSeatMapView(generics.RetrieveAPIView):
+    serializer_class = SeatMapSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        # Prefetch keeps the seat map to two ordered queries: trip/layout, then seats.
+        return Trip.objects.select_related("bus").prefetch_related("seats")

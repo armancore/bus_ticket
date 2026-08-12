@@ -181,5 +181,9 @@ class TripSeat(models.Model):
             ),
         ]
 
+    @property
+    def effective_fare(self):
+        return self.price_override if self.price_override is not None else self.trip.base_fare
+
     def __str__(self):
         return f"{self.trip_id} / {self.seat_code}"

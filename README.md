@@ -115,6 +115,14 @@ The public search API accepts exact city names and a local travel date:
 GET /api/trips/?origin=Kathmandu&destination=Pokhara&date=2026-08-13
 ```
 
+Trip details include a read-only seat map generated entirely from the bus layout JSON. Live seat states are available from:
+
+```text
+GET /api/trips/{trip_id}/seats/
+```
+
+The React page refreshes this endpoint every 15 seconds. Selecting a seat in this phase only inspects its status and fare; it does not reserve the seat yet.
+
 ## Data model overview
 
 The complete ER diagram will be added when the booking models are introduced. The custom `User` model was created in the first migration so every later foreign key points to the correct user table.

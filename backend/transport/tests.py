@@ -169,3 +169,26 @@ class PublicTripAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["bus"]["name"], "API Express")
         self.assertIn("bus_layout", response.data)
+
+    def test_anonymous_user_can_view_seat_map_without_hold_owner_data(self):
+        held_seat = self.trip.seats.get(seat_code="A1")
+        held_seat.status = TripSeat.Status.HELD
+        held_seat.held_by = operator = User.objects.create_user(
+            username="seat_holder",
+            password="StrongPass123!",
+        )
+        held_seat.held_until = timezone.now() + timedelta(minutes=10)
+        held_seat.save(update_fields=["status", "held_by", "held_until"])
+
+        response = self.client.get(reverse("trip-seat-map", args=[self.trip.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["layout"], SIMPLE_LAYOUT)
+        self.assertEqual(len(response.data["seats"]), 3)
+        serialized_held_seat = next(
+            seat for seat in response.data["seats"] if seat["seat_code"] == "A1"
+        )
+        self.assertEqual(serialized_held_seat["status"], TripSeat.Status.HELD)
+        self.assertEqual(serialized_held_seat["effective_fare"], "1200.00")
+        self.assertNotIn("held_by", serialized_held_seat)
+        self.assertNotContains(response, operator.username)
