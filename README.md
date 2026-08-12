@@ -123,6 +123,22 @@ GET /api/trips/{trip_id}/seats/
 
 The React page refreshes this endpoint every 15 seconds. Selecting a seat in this phase only inspects its status and fare; it does not reserve the seat yet.
 
+## Seat holds and booking confirmation
+
+Customers sign in, select one or more available seats, and place a 10-minute hold. PostgreSQL row locks are acquired in primary-key order inside `transaction.atomic()` so simultaneous requests cannot reserve the same seat.
+
+```text
+POST /api/bookings/hold/
+POST /api/bookings/{booking_reference}/confirm/
+GET  /api/bookings/
+GET  /api/bookings/{booking_reference}/
+POST /api/bookings/{booking_reference}/cancel/
+```
+
+Passenger details are collected once for each held seat. Confirmation uses a mock payment result and does not collect card data. Expired holds are released lazily during seat-map reads, new hold attempts, and booking reads—no background worker is required.
+
+The `BookingSeat` table also has a PostgreSQL partial unique constraint on charged seats. This is a database-level backstop against two active confirmed booking records charging the same `TripSeat`.
+
 ## Data model overview
 
 The complete ER diagram will be added when the booking models are introduced. The custom `User` model was created in the first migration so every later foreign key points to the correct user table.

@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "django_filters",
     "users",
     "transport",
+    "bookings",
 ]
 
 MIDDLEWARE = [

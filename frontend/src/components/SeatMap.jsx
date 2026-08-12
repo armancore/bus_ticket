@@ -16,7 +16,16 @@ const STATUS_STYLES = {
   BOOKED: 'border-stone-200 bg-stone-200 text-stone-400',
 }
 
-export function SeatMap({ layout, seats, refreshedAt }) {
+export function SeatMap({
+  layout,
+  seats,
+  refreshedAt,
+  selectedSeatCodes = [],
+  onToggleSeat,
+  onHold,
+  isHolding = false,
+  holdError,
+}) {
   const [activeDeckIndex, setActiveDeckIndex] = useState(0)
   const [inspectedSeatCode, setInspectedSeatCode] = useState(null)
   const seatByCode = useMemo(
@@ -25,6 +34,7 @@ export function SeatMap({ layout, seats, refreshedAt }) {
   )
   const deck = layout.decks[activeDeckIndex]
   const inspectedSeat = inspectedSeatCode ? seatByCode.get(inspectedSeatCode) : null
+  const selectedSeats = selectedSeatCodes.map((code) => seatByCode.get(code)).filter(Boolean)
   const availableCount = seats.filter((seat) => seat.status === 'AVAILABLE').length
 
   return (
@@ -38,7 +48,7 @@ export function SeatMap({ layout, seats, refreshedAt }) {
         <div>
           <p className="text-xs font-bold tracking-[0.16em] text-signal uppercase">Live availability</p>
           <h2 id="seat-map-heading" className="mt-2 font-display text-3xl sm:text-4xl">Choose where you’ll sit</h2>
-          <p className="mt-2 text-sm text-stone-500">Inspect the live seat map. Selection opens in the booking phase.</p>
+          <p className="mt-2 text-sm text-stone-500">Select available seats, then hold them for 10 minutes while you add passenger details.</p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-moss">{availableCount}</p>
@@ -85,6 +95,8 @@ export function SeatMap({ layout, seats, refreshedAt }) {
               const seat = seatByCode.get(layoutSeat.code)
               if (!seat) return null
               const isInspected = inspectedSeatCode === seat.seat_code
+              const isSelected = selectedSeatCodes.includes(seat.seat_code)
+              const statusLabel = isSelected ? 'Selected' : getStatusLabel(seat)
               return (
                 <motion.button
                   key={seat.seat_code}
@@ -92,20 +104,24 @@ export function SeatMap({ layout, seats, refreshedAt }) {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: Math.min(index * 0.018, 0.35) }}
-                  onClick={() => setInspectedSeatCode(seat.seat_code)}
+                  onClick={() => {
+                    setInspectedSeatCode(seat.seat_code)
+                    if (seat.status === 'AVAILABLE') onToggleSeat?.(seat.seat_code)
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
                       setInspectedSeatCode(seat.seat_code)
+                      if (seat.status === 'AVAILABLE') onToggleSeat?.(seat.seat_code)
                     }
                   }}
-                  aria-pressed={isInspected}
-                  aria-label={`${seat.seat_code}, ${STATUS_LABELS[seat.status]}, ${formatCurrency(seat.effective_fare)}`}
+                  aria-pressed={isSelected}
+                  aria-label={`${seat.seat_code}, ${statusLabel}, ${formatCurrency(seat.effective_fare)}`}
                   style={{
                     gridColumn: getDisplayColumn(layoutSeat.column, deck.aisle_after_columns),
                     gridRow: layoutSeat.row,
                   }}
-                  className={`relative flex aspect-square min-h-11 items-center justify-center rounded-xl border-2 text-sm font-extrabold transition-all ${STATUS_STYLES[seat.status]} ${isInspected ? 'ring-3 ring-signal/35 ring-offset-2' : ''}`}
+                  className={`relative flex aspect-square min-h-11 items-center justify-center rounded-xl border-2 text-sm font-extrabold transition-all ${isSelected ? 'border-signal bg-signal text-white shadow-md' : STATUS_STYLES[seat.status]} ${isInspected && !isSelected ? 'ring-3 ring-signal/35 ring-offset-2' : ''}`}
                 >
                   {seat.status === 'BOOKED' ? <X size={18} aria-hidden="true" /> : seat.seat_code}
                 </motion.button>
@@ -114,7 +130,10 @@ export function SeatMap({ layout, seats, refreshedAt }) {
           </div>
         </div>
 
-        <SeatInspector seat={inspectedSeat} refreshedAt={refreshedAt} />
+        <div className="space-y-7">
+          <SeatInspector seat={inspectedSeat} refreshedAt={refreshedAt} selectedSeatCodes={selectedSeatCodes} />
+          <SelectionSummary seats={selectedSeats} onHold={onHold} isHolding={isHolding} holdError={holdError} />
+        </div>
       </div>
     </motion.section>
   )
@@ -124,6 +143,7 @@ function SeatLegend() {
   return (
     <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm text-stone-600" aria-label="Seat status legend">
       <LegendItem className="border-moss/40 bg-white" label="Available" />
+      <LegendItem className="border-signal bg-signal" label="Selected" />
       <LegendItem className="border-orange-300 bg-orange-100" label="Held" />
       <LegendItem className="border-stone-200 bg-stone-200" label="Booked" />
     </ul>
@@ -134,7 +154,7 @@ function LegendItem({ className, label }) {
   return <li className="flex items-center gap-2"><span className={`size-5 rounded-md border-2 ${className}`} />{label}</li>
 }
 
-function SeatInspector({ seat, refreshedAt }) {
+function SeatInspector({ seat, refreshedAt, selectedSeatCodes }) {
   if (!seat) {
     return (
       <aside className="border-y border-stone-200 py-7 text-stone-500">
@@ -158,10 +178,26 @@ function SeatInspector({ seat, refreshedAt }) {
         {seat.status === 'BOOKED' && <X className="text-stone-400" aria-hidden="true" />}
       </div>
       <dl className="mt-6 divide-y divide-stone-200 border-t border-stone-200">
-        <div className="flex justify-between gap-4 py-4"><dt className="text-sm text-stone-500">Status</dt><dd className="text-sm font-bold">{STATUS_LABELS[seat.status]}</dd></div>
+        <div className="flex justify-between gap-4 py-4"><dt className="text-sm text-stone-500">Status</dt><dd className="text-sm font-bold">{selectedSeatCodes.includes(seat.seat_code) ? 'Selected' : getStatusLabel(seat)}</dd></div>
         <div className="flex justify-between gap-4 py-4"><dt className="text-sm text-stone-500">Fare</dt><dd className="font-bold">{formatCurrency(seat.effective_fare)}</dd></div>
       </dl>
       <Freshness refreshedAt={refreshedAt} />
+    </aside>
+  )
+}
+
+function SelectionSummary({ seats, onHold, isHolding, holdError }) {
+  const total = seats.reduce((sum, seat) => sum + Number(seat.effective_fare), 0)
+  return (
+    <aside className="border-y border-stone-300 py-6" aria-live="polite">
+      <div className="flex items-end justify-between gap-4">
+        <div><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Your selection</p><p className="mt-2 font-bold">{seats.length ? seats.map((seat) => seat.seat_code).join(', ') : 'No seats selected'}</p></div>
+        {seats.length > 0 && <p className="text-xl font-bold">{formatCurrency(total)}</p>}
+      </div>
+      {holdError && <p className="mt-4 text-sm font-semibold text-red-700" role="alert">{holdError}</p>}
+      <button type="button" disabled={!seats.length || isHolding} onClick={onHold} className="mt-5 w-full rounded-full bg-ink px-6 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500">
+        {isHolding ? 'Holding seats…' : seats.length ? `Hold ${seats.length} seat${seats.length > 1 ? 's' : ''}` : 'Select seats to continue'}
+      </button>
     </aside>
   )
 }
@@ -185,4 +221,9 @@ function getDisplayColumn(column, aisleAfterColumns) {
 
 function formatDeckName(value) {
   return value.charAt(0) + value.slice(1).toLowerCase()
+}
+
+function getStatusLabel(seat) {
+  if (seat.status === 'HELD' && seat.is_held_by_me) return 'Held for you'
+  return STATUS_LABELS[seat.status]
 }

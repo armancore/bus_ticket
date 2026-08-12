@@ -45,6 +45,19 @@ select {
   outline-offset: 3px;
 }
 
+.field-input {
+  margin-top: 0.5rem;
+  width: 100%;
+  border-bottom: 1px solid #d6d3d1;
+  background: transparent;
+  padding: 0.75rem 0;
+  outline: none;
+}
+
+.field-input:focus {
+  border-color: var(--color-signal);
+}
+
 .journey-line::before {
   content: "";
   position: absolute;

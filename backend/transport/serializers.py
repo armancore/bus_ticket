@@ -51,10 +51,20 @@ class TripSeatSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True,
     )
+    is_held_by_me = serializers.SerializerMethodField()
 
     class Meta:
         model = TripSeat
-        fields = ("id", "seat_code", "status", "effective_fare")
+        fields = ("id", "seat_code", "status", "effective_fare", "is_held_by_me")
+
+    def get_is_held_by_me(self, seat) -> bool:
+        request = self.context.get("request")
+        return bool(
+            request
+            and request.user.is_authenticated
+            and seat.status == TripSeat.Status.HELD
+            and seat.held_by_id == request.user.id
+        )
 
 
 class SeatMapSerializer(serializers.ModelSerializer):

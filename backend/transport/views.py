@@ -1,5 +1,7 @@
 from rest_framework import generics, permissions
 
+from bookings.services import expire_holds_for_trip
+
 from .filters import TripFilter
 from .models import Route, Trip
 from .serializers import (
@@ -45,3 +47,8 @@ class TripSeatMapView(generics.RetrieveAPIView):
     def get_queryset(self):
         # Prefetch keeps the seat map to two ordered queries: trip/layout, then seats.
         return Trip.objects.select_related("bus").prefetch_related("seats")
+
+    def retrieve(self, request, *args, **kwargs):
+        # Lazy cleanup keeps TripSeat as the source of truth without a worker queue.
+        expire_holds_for_trip(kwargs["pk"])
+        return super().retrieve(request, *args, **kwargs)

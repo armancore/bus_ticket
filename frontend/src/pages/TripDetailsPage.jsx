@@ -1,18 +1,36 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, BusFront, CalendarDays, Clock3, MapPin } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
+import { holdSeats } from '../api/bookings.js'
+import { hasAccessToken } from '../api/client.js'
 import { getTrip, getTripSeatMap } from '../api/trips.js'
 import { SeatMap } from '../components/SeatMap.jsx'
 import { formatCurrency, formatDateHeading, formatTime } from '../utils/formatters.js'
 
 export function TripDetailsPage() {
   const { tripId } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [selectedSeatCodes, setSelectedSeatCodes] = useState(() => (
+    (searchParams.get('seats') || '').split(',').filter(Boolean)
+  ))
   const tripQuery = useQuery({ queryKey: ['trip', tripId], queryFn: () => getTrip(tripId) })
   const seatMapQuery = useQuery({
     queryKey: ['trip-seat-map', tripId],
     queryFn: () => getTripSeatMap(tripId),
     refetchInterval: 15_000,
+  })
+  const holdMutation = useMutation({
+    mutationFn: holdSeats,
+    onSuccess: (hold) => {
+      queryClient.invalidateQueries({ queryKey: ['trip-seat-map', tripId] })
+      navigate(`/bookings/${hold.booking_reference}/passengers`)
+    },
+    onError: () => queryClient.invalidateQueries({ queryKey: ['trip-seat-map', tripId] }),
   })
 
   if (tripQuery.isPending) {
@@ -29,6 +47,37 @@ export function TripDetailsPage() {
   }
 
   const trip = tripQuery.data
+  const selectableCodes = new Set(
+    (seatMapQuery.data?.seats || [])
+      .filter((seat) => seat.status === 'AVAILABLE')
+      .map((seat) => seat.seat_code),
+  )
+  const validSelectedCodes = selectedSeatCodes.filter((code) => selectableCodes.has(code))
+
+  function toggleSeat(seatCode) {
+    const next = selectedSeatCodes.includes(seatCode)
+      ? selectedSeatCodes.filter((code) => code !== seatCode)
+      : [...selectedSeatCodes, seatCode]
+    setSelectedSeatCodes(next)
+    const nextParams = new URLSearchParams(searchParams)
+    if (next.length) nextParams.set('seats', next.join(','))
+    else nextParams.delete('seats')
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function handleHold() {
+    if (!hasAccessToken()) {
+      const nextPath = `${location.pathname}${location.search}`
+      navigate(`/login?next=${encodeURIComponent(nextPath)}`)
+      return
+    }
+    holdMutation.mutate({ tripId: Number(tripId), seatCodes: validSelectedCodes })
+  }
+
+  const holdErrorData = holdMutation.error?.response?.data
+  const holdError = holdErrorData?.conflicting_seats?.length
+    ? `Seat conflict: ${holdErrorData.conflicting_seats.join(', ')}. Refresh your selection.`
+    : holdErrorData?.detail
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-16">
       <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-stone-500 hover:text-ink">
@@ -67,6 +116,11 @@ export function TripDetailsPage() {
           layout={seatMapQuery.data.layout}
           seats={seatMapQuery.data.seats}
           refreshedAt={seatMapQuery.data.refreshed_at}
+          selectedSeatCodes={validSelectedCodes}
+          onToggleSeat={toggleSeat}
+          onHold={handleHold}
+          isHolding={holdMutation.isPending}
+          holdError={holdError}
         />
       )}
     </main>

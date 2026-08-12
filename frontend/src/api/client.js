@@ -52,9 +52,15 @@ apiClient.interceptors.response.use(
 export function storeTokens({ access, refresh }) {
   localStorage.setItem(ACCESS_TOKEN_KEY, access)
   localStorage.setItem(REFRESH_TOKEN_KEY, refresh)
+  window.dispatchEvent(new Event('auth:changed'))
 }
 
 export function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)
+  window.dispatchEvent(new Event('auth:changed'))
+}
+
+export function hasAccessToken() {
+  return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY))
 }

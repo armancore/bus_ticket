@@ -179,6 +179,16 @@ class TripSeat(models.Model):
                 condition=Q(price_override__isnull=True) | Q(price_override__gte=0),
                 name="trip_seat_price_override_non_negative",
             ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status="HELD", held_until__isnull=False, held_by__isnull=False)
+                    | (
+                        ~Q(status="HELD")
+                        & Q(held_until__isnull=True, held_by__isnull=True)
+                    )
+                ),
+                name="held_seat_requires_owner_and_expiry",
+            ),
         ]
 
     @property
