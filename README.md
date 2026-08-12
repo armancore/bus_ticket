@@ -149,6 +149,18 @@ The `BookingSeat` table also has a PostgreSQL partial unique constraint on charg
 
 Public signup always creates a customer. Create trusted operator accounts through Django admin and assign the `OPERATOR` role.
 
+## Customer tickets
+
+Signed-in customers can open `/bookings` to see pending, confirmed, cancelled, and expired bookings. A pending booking can be continued while its seat hold is active, and an eligible booking can be cancelled from the same page.
+
+Every confirmed booking has a printable e-ticket at:
+
+```text
+/tickets/{booking_reference}
+```
+
+The ticket includes the trip, bus, seats, passenger details, payment reference, and a QR code containing the booking reference. This phase uses `qrcode.react` to draw the QR code in the browser. The print stylesheet removes the application header and action buttons so only the ticket is printed.
+
 ## Data model overview
 
 The complete ER diagram will be added when the booking models are introduced. The custom `User` model was created in the first migration so every later foreign key points to the correct user table.

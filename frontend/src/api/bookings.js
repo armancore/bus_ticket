@@ -13,6 +13,11 @@ export async function getBooking(reference) {
   return response.data
 }
 
+export async function getMyBookings() {
+  const response = await apiClient.get('/bookings/')
+  return response.data
+}
+
 export async function confirmBooking({ reference, passengers, simulatePaymentSuccess }) {
   const response = await apiClient.post(`/bookings/${reference}/confirm/`, {
     passengers,

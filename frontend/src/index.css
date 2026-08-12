@@ -58,6 +58,28 @@ select {
   border-color: var(--color-signal);
 }
 
+@media print {
+  body {
+    background: white;
+  }
+
+  body > #root > div > header,
+  .ticket-actions {
+    display: none !important;
+  }
+
+  .ticket-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .ticket-document {
+    border: 1px solid #d6d3d1;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
 .journey-line::before {
   content: "";
   position: absolute;

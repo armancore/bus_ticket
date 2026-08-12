@@ -6,7 +6,7 @@ import { logout } from '../api/auth.js'
 import { getStoredUser } from '../api/client.js'
 
 const DASHBOARD_PATHS = {
-  CUSTOMER: '/',
+  CUSTOMER: '/bookings',
   OPERATOR: '/operator',
   ADMIN: '/admin-dashboard',
 }

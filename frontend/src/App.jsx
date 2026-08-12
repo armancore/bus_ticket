@@ -9,6 +9,8 @@ import { TripDetailsPage } from './pages/TripDetailsPage.jsx'
 import { SignupPage } from './pages/SignupPage.jsx'
 import { OperatorDashboardPage } from './pages/OperatorDashboardPage.jsx'
 import { AdminDashboardPage } from './pages/AdminDashboardPage.jsx'
+import { MyBookingsPage } from './pages/MyBookingsPage.jsx'
+import { TicketPage } from './pages/TicketPage.jsx'
 
 export default function App() {
   return (
@@ -20,9 +22,11 @@ export default function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/operator" element={<OperatorDashboardPage />} />
         <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+        <Route path="/bookings" element={<MyBookingsPage />} />
         <Route path="/trips/:tripId" element={<TripDetailsPage />} />
         <Route path="/bookings/:reference/passengers" element={<PassengerDetailsPage />} />
         <Route path="/bookings/:reference/confirmed" element={<BookingConfirmationPage />} />
+        <Route path="/tickets/:reference" element={<TicketPage />} />
       </Routes>
     </div>
   )

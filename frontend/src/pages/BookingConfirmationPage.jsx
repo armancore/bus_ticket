@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check, MapPin } from 'lucide-react'
+import { Check, QrCode } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 
 import { getBooking } from '../api/bookings.js'
@@ -27,8 +27,11 @@ export function BookingConfirmationPage() {
         <Summary label="Seats" value={booking.seats.map((seat) => seat.seat_code).join(', ')} />
         <Summary label="Paid" value={formatCurrency(booking.total_amount)} />
       </dl>
-      <div className="mt-8 flex items-start gap-3 border-y border-stone-200 py-6 text-sm text-stone-500"><MapPin size={18} className="mt-0.5 shrink-0 text-moss" /><p>Your complete ticket with QR code will be added in the next phase. Keep your booking reference for now.</p></div>
-      <Link to="/" className="mt-8 inline-block rounded-full bg-ink px-6 py-3 font-bold text-white">Search another trip</Link>
+      <div className="mt-8 flex items-start gap-3 border-y border-stone-200 py-6 text-sm text-stone-500"><QrCode size={18} className="mt-0.5 shrink-0 text-moss" /><p>Your ticket is ready. Its QR code contains booking reference {booking.booking_reference}.</p></div>
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link to={`/tickets/${booking.booking_reference}`} className="rounded-full bg-ink px-6 py-3 font-bold text-white">View ticket</Link>
+        <Link to="/" className="rounded-full border border-stone-300 px-6 py-3 font-bold text-stone-600">Search another trip</Link>
+      </div>
     </main>
   )
 }
