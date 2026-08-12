@@ -5,13 +5,14 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { getBooking } from '../api/bookings.js'
 import { hasAccessToken } from '../api/client.js'
 import { formatCurrency, formatDateHeading, formatTime } from '../utils/formatters.js'
+import { QueryError } from '../components/QueryError.jsx'
 
 export function BookingConfirmationPage() {
   const { reference } = useParams()
   const bookingQuery = useQuery({ queryKey: ['booking', reference], queryFn: () => getBooking(reference), enabled: hasAccessToken() })
   if (!hasAccessToken()) return <Navigate to="/login" replace />
   if (bookingQuery.isPending) return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8">Loading confirmation…</main>
-  if (bookingQuery.isError) return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8">Booking unavailable.</main>
+  if (bookingQuery.isError) return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8"><QueryError title="Confirmation could not be loaded" message="Check your connection or open the booking from your account." onRetry={() => bookingQuery.refetch()} /><Link to="/bookings" className="font-bold text-signal">My bookings</Link></main>
   const booking = bookingQuery.data
   if (booking.status !== 'CONFIRMED') return <Navigate to={`/bookings/${reference}/passengers`} replace />
 

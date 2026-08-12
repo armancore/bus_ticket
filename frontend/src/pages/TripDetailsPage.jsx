@@ -38,10 +38,15 @@ export function TripDetailsPage() {
   }
 
   if (tripQuery.isError) {
+    const isMissing = tripQuery.error.response?.status === 404
     return (
       <main className="mx-auto max-w-5xl px-5 py-16 sm:px-8">
         <h1 className="font-display text-4xl">Trip not available</h1>
-        <Link to="/" className="mt-6 inline-block font-bold text-signal">Return to search</Link>
+        <p className="mt-3 text-stone-500">{isMissing ? 'This trip does not exist or is no longer available.' : 'The trip could not be loaded. Check your connection.'}</p>
+        <div className="mt-6 flex gap-5">
+          {!isMissing && <button type="button" onClick={() => tripQuery.refetch()} className="font-bold text-signal underline underline-offset-4">Try again</button>}
+          <Link to="/" className="font-bold text-stone-600">Return to search</Link>
+        </div>
       </main>
     )
   }

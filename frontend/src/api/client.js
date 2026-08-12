@@ -42,6 +42,7 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       localStorage.removeItem(ACCESS_TOKEN_KEY)
       localStorage.removeItem(REFRESH_TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
       window.dispatchEvent(new Event('auth:expired'))
       return Promise.reject(refreshError)
     } finally {

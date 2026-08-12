@@ -5,6 +5,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { cancelBooking, getMyBookings } from '../api/bookings.js'
 import { getStoredUser } from '../api/client.js'
 import { formatCurrency, formatDateHeading, formatTime } from '../utils/formatters.js'
+import { QueryError } from '../components/QueryError.jsx'
 
 export function MyBookingsPage() {
   const user = getStoredUser()
@@ -34,14 +35,14 @@ export function MyBookingsPage() {
       </div>
 
       {bookingsQuery.isPending && <p className="py-12 text-stone-500">Loading your bookings…</p>}
-      {bookingsQuery.isError && <p className="py-12 font-semibold text-red-700" role="alert">Your bookings could not be loaded. Please sign in again or check the connection.</p>}
+      {bookingsQuery.isError && <QueryError title="Your bookings could not be loaded" message="Check the connection or sign in again." onRetry={() => bookingsQuery.refetch()} />}
       {bookingsQuery.data?.length === 0 && <EmptyBookings />}
       <div className="divide-y divide-stone-200">
         {bookingsQuery.data?.map((booking) => (
           <BookingRow
             key={booking.booking_reference}
             booking={booking}
-            onCancel={() => cancelMutation.mutate(booking.booking_reference)}
+            onCancel={() => confirmCancel(() => cancelMutation.mutate(booking.booking_reference))}
             isCancelling={cancelMutation.isPending && cancelMutation.variables === booking.booking_reference}
           />
         ))}
@@ -80,4 +81,8 @@ function Status({ value }) {
 
 function EmptyBookings() {
   return <section className="py-16"><Ticket className="text-moss" /><h2 className="mt-4 font-display text-3xl">No bookings yet</h2><p className="mt-2 text-stone-500">Your confirmed tickets and pending holds will appear here.</p><Link to="/" className="mt-6 inline-block font-bold text-signal">Search available trips</Link></section>
+}
+
+function confirmCancel(action) {
+  if (window.confirm('Cancel this booking and release its seats?')) action()
 }

@@ -63,7 +63,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# PostgreSQL is required because the booking phase will use SELECT ... FOR UPDATE.
+# PostgreSQL is required because seat holds use SELECT ... FOR UPDATE.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

@@ -1,4 +1,4 @@
-import { BusFront, LogOut, UserRound } from 'lucide-react'
+import { AlertCircle, BusFront, LogOut, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -13,15 +13,17 @@ const DASHBOARD_PATHS = {
 
 export function AppHeader() {
   const [user, setUser] = useState(getStoredUser())
+  const [sessionExpired, setSessionExpired] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
-    const updateAuthState = () => setUser(getStoredUser())
+    const updateAuthState = () => { setUser(getStoredUser()); setSessionExpired(false) }
+    const expireAuthState = () => { setUser(null); setSessionExpired(true) }
     window.addEventListener('auth:changed', updateAuthState)
-    window.addEventListener('auth:expired', updateAuthState)
+    window.addEventListener('auth:expired', expireAuthState)
     return () => {
       window.removeEventListener('auth:changed', updateAuthState)
-      window.removeEventListener('auth:expired', updateAuthState)
+      window.removeEventListener('auth:expired', expireAuthState)
     }
   }, [])
 
@@ -62,6 +64,15 @@ export function AppHeader() {
           )}
         </nav>
       </div>
+      {sessionExpired && (
+        <div className="bg-orange-100 text-orange-950" role="alert">
+          <div className="mx-auto flex max-w-7xl items-center gap-3 px-5 py-2.5 text-sm sm:px-8">
+            <AlertCircle size={17} aria-hidden="true" />
+            <p className="flex-1">Your session expired. <Link to="/login" className="font-bold underline underline-offset-2">Sign in again</Link> to continue.</p>
+            <button type="button" onClick={() => setSessionExpired(false)} aria-label="Dismiss session message" className="rounded-full p-1 hover:bg-orange-200"><X size={16} /></button>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

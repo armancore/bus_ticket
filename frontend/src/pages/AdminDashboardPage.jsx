@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { getAdminBookings, getAdminSummary } from '../api/dashboards.js'
 import { getStoredUser } from '../api/client.js'
 import { formatCurrency, formatDateHeading } from '../utils/formatters.js'
+import { QueryError } from '../components/QueryError.jsx'
 
 export function AdminDashboardPage() {
   const user = getStoredUser()
@@ -20,7 +21,8 @@ export function AdminDashboardPage() {
         <p className="mt-3 text-stone-500">System-wide booking and revenue information.</p>
       </div>
 
-      {summaryQuery.isError && <p className="mt-8 text-red-700" role="alert">Admin summary could not be loaded.</p>}
+      {summaryQuery.isPending && <p className="mt-8 text-stone-500" role="status">Loading summary…</p>}
+      {summaryQuery.isError && <QueryError title="Admin summary could not be loaded" onRetry={() => summaryQuery.refetch()} />}
       {summaryQuery.data && (
         <dl className="grid border-b border-stone-300 sm:grid-cols-2 lg:grid-cols-4">
           <Metric label="All bookings" value={summaryQuery.data.total_bookings} />
@@ -33,7 +35,7 @@ export function AdminDashboardPage() {
       <section className="mt-10" aria-labelledby="all-bookings-heading">
         <div className="flex items-end justify-between"><div><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Operations</p><h2 id="all-bookings-heading" className="mt-2 font-display text-3xl">Recent bookings</h2></div></div>
         {bookingsQuery.isPending && <p className="mt-6 text-stone-500">Loading bookings…</p>}
-        {bookingsQuery.isError && <p className="mt-6 text-red-700" role="alert">Bookings could not be loaded.</p>}
+        {bookingsQuery.isError && <QueryError title="Bookings could not be loaded" onRetry={() => bookingsQuery.refetch()} />}
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-3xl text-left text-sm">
             <thead className="border-b border-stone-300 text-xs tracking-wider text-stone-400 uppercase"><tr><th className="py-3">Reference</th><th>Journey</th><th>Travel date</th><th>Seats</th><th>Status</th><th className="text-right">Amount</th></tr></thead>

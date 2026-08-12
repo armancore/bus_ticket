@@ -6,6 +6,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { confirmBooking, getBooking } from '../api/bookings.js'
 import { hasAccessToken } from '../api/client.js'
 import { formatCurrency } from '../utils/formatters.js'
+import { QueryError } from '../components/QueryError.jsx'
 
 export function PassengerDetailsPage() {
   const { reference } = useParams()
@@ -13,7 +14,7 @@ export function PassengerDetailsPage() {
 
   if (!hasAccessToken()) return <Navigate to={`/login?next=${encodeURIComponent(`/bookings/${reference}/passengers`)}`} replace />
   if (bookingQuery.isPending) return <main className="mx-auto max-w-5xl px-5 py-16 sm:px-8">Loading your hold…</main>
-  if (bookingQuery.isError) return <BookingLoadError />
+  if (bookingQuery.isError) return <BookingLoadError error={bookingQuery.error} onRetry={() => bookingQuery.refetch()} />
   return <PassengerForm key={bookingQuery.data.booking_reference} booking={bookingQuery.data} />
 }
 
@@ -115,8 +116,9 @@ function ExpiredHold({ tripId }) {
   return <section className="py-16"><AlertTriangle className="text-signal" /><h2 className="mt-4 font-display text-3xl">Your seat hold has expired.</h2><p className="mt-2 text-stone-500">Return to the live map to choose available seats again.</p><Link to={`/trips/${tripId}`} className="mt-6 inline-block rounded-full bg-ink px-6 py-3 font-bold text-white">Choose seats again</Link></section>
 }
 
-function BookingLoadError() {
-  return <main className="mx-auto max-w-5xl px-5 py-16 sm:px-8"><h1 className="font-display text-4xl">Booking unavailable</h1><p className="mt-3 text-stone-500">This booking may belong to another account or no longer exist.</p><Link to="/" className="mt-6 inline-block font-bold text-signal">Return to search</Link></main>
+function BookingLoadError({ error, onRetry }) {
+  const isMissing = error.response?.status === 404
+  return <main className="mx-auto max-w-5xl px-5 py-16 sm:px-8"><h1 className="font-display text-4xl">Booking unavailable</h1><QueryError title={isMissing ? 'This hold was not found' : 'The booking could not be loaded'} message={isMissing ? 'It may belong to another account or no longer exist.' : 'Check your connection and try again.'} onRetry={isMissing ? undefined : onRetry} /><Link to="/" className="inline-block font-bold text-signal">Return to search</Link></main>
 }
 
 function useCountdown(expiresAt) {

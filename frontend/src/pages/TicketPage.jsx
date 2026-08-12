@@ -6,6 +6,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { getBooking } from '../api/bookings.js'
 import { getStoredUser } from '../api/client.js'
 import { formatCurrency, formatDateHeading, formatTime } from '../utils/formatters.js'
+import { QueryError } from '../components/QueryError.jsx'
 
 export function TicketPage() {
   const { reference } = useParams()
@@ -19,7 +20,10 @@ export function TicketPage() {
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/tickets/${reference}`)}`} replace />
   if (user.role !== 'CUSTOMER') return <Navigate to="/" replace />
   if (bookingQuery.isPending) return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8">Loading ticket…</main>
-  if (bookingQuery.isError) return <TicketUnavailable message="This ticket does not exist or belongs to another customer." />
+  if (bookingQuery.isError) {
+    const isMissing = bookingQuery.error.response?.status === 404
+    return <TicketUnavailable message={isMissing ? 'This ticket does not exist or belongs to another customer.' : 'The ticket could not be loaded. Check your connection.'} onRetry={isMissing ? undefined : () => bookingQuery.refetch()} />
+  }
   if (bookingQuery.data.status !== 'CONFIRMED') return <TicketUnavailable message={`A ${bookingQuery.data.status.toLowerCase()} booking does not have an active ticket.`} />
 
   return <ConfirmedTicket booking={bookingQuery.data} />
@@ -81,6 +85,6 @@ function TicketDetail({ icon: Icon, label, value }) {
   return <div className="flex gap-3"><Icon size={18} className="mt-0.5 shrink-0 text-moss" /><div><dt className="text-xs font-bold tracking-wider text-stone-400 uppercase">{label}</dt><dd className="mt-1 font-semibold">{value}</dd></div></div>
 }
 
-function TicketUnavailable({ message }) {
-  return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8"><UserRound className="text-stone-400" /><h1 className="mt-5 font-display text-4xl">Ticket unavailable</h1><p className="mt-3 text-stone-500">{message}</p><Link to="/bookings" className="mt-6 inline-block font-bold text-signal">Return to my bookings</Link></main>
+function TicketUnavailable({ message, onRetry }) {
+  return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8"><UserRound className="text-stone-400" /><h1 className="mt-5 font-display text-4xl">Ticket unavailable</h1><QueryError title="The ticket is not available" message={message} onRetry={onRetry} /><Link to="/bookings" className="inline-block font-bold text-signal">Return to my bookings</Link></main>
 }
