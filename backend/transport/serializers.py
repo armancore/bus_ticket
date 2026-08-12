@@ -78,3 +78,18 @@ class SeatMapSerializer(serializers.ModelSerializer):
 
     def get_refreshed_at(self, _trip) -> datetime:
         return timezone.now()
+
+
+class ManifestPassengerSerializer(serializers.Serializer):
+    booking_reference = serializers.CharField()
+    seat_code = serializers.CharField()
+    passenger_name = serializers.CharField()
+    age = serializers.IntegerField()
+    gender = serializers.CharField()
+    fare_charged = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class PassengerManifestSerializer(serializers.Serializer):
+    trip = TripListSerializer()
+    passenger_count = serializers.IntegerField()
+    passengers = ManifestPassengerSerializer(many=True)

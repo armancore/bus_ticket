@@ -1,10 +1,16 @@
 from django.shortcuts import get_object_or_404
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
+from decimal import Decimal
 from rest_framework import generics, status
 from rest_framework.response import Response
 
 from .models import Booking
 from .permissions import IsCustomer
 from .serializers import BookingSerializer, ConfirmBookingSerializer, HoldSeatsSerializer
+from .serializers import AdminSummarySerializer
+from transport.models import TripSeat
+from transport.permissions import IsAdminRole
 from .services import (
     BookingStateError,
     HoldExpiredError,
@@ -145,3 +151,47 @@ class CancelBookingView(generics.GenericAPIView):
                 status=status.HTTP_409_CONFLICT,
             )
         return Response(BookingSerializer(booking, context={"request": request}).data)
+
+
+class AdminBookingListView(generics.ListAPIView):
+    serializer_class = BookingSerializer
+    permission_classes = [IsAdminRole]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            Booking.objects.select_related(
+                "trip", "trip__bus", "trip__bus__operator", "trip__route"
+            )
+            .prefetch_related("seats__trip_seat", "payments")
+            .order_by("-created_at")
+        )
+
+
+class AdminSummaryView(generics.GenericAPIView):
+    serializer_class = AdminSummarySerializer
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        confirmed = Booking.objects.filter(status=Booking.Status.CONFIRMED)
+        revenue = confirmed.aggregate(
+            value=Coalesce(Sum("total_amount"), Decimal("0.00"))
+        )["value"]
+        booked_seats = TripSeat.objects.filter(status=TripSeat.Status.BOOKED).count()
+        total_trip_seats = TripSeat.objects.count()
+        occupancy = (
+            Decimal(booked_seats * 100) / Decimal(total_trip_seats)
+            if total_trip_seats
+            else Decimal("0.00")
+        )
+        serializer = self.get_serializer(
+            {
+                "total_bookings": Booking.objects.count(),
+                "confirmed_bookings": confirmed.count(),
+                "total_revenue": revenue,
+                "booked_seats": booked_seats,
+                "total_trip_seats": total_trip_seats,
+                "occupancy_rate": occupancy.quantize(Decimal("0.01")),
+            }
+        )
+        return Response(serializer.data)

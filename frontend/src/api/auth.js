@@ -1,14 +1,25 @@
-import { apiClient, clearTokens, storeTokens } from './client.js'
+import { apiClient, clearTokens, storeCurrentUser, storeTokens } from './client.js'
 
 export async function login(credentials) {
   const response = await apiClient.post('/auth/token/', credentials)
   storeTokens(response.data)
   try {
-    return await getCurrentUser()
+    const user = await getCurrentUser()
+    storeCurrentUser(user)
+    return user
   } catch (error) {
     clearTokens()
     throw error
   }
+}
+
+export async function registerCustomer(data) {
+  await apiClient.post('/auth/register/', data)
+  return login({ username: data.username, password: data.password })
+}
+
+export function logout() {
+  clearTokens()
 }
 
 export async function getCurrentUser() {

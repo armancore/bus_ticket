@@ -237,6 +237,25 @@ class BookingFlowAPITests(APITestCase):
                 fare_charged=Decimal("1200.00"),
             )
 
+    def test_only_admin_can_view_all_bookings_and_summary(self):
+        self.hold()
+        customer_response = self.client.get(reverse("admin-booking-list"))
+        self.assertEqual(customer_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        admin = User.objects.create_user(
+            username="dashboard_admin",
+            password="StrongPass123!",
+            role=User.Role.ADMIN,
+        )
+        self.client.force_authenticate(admin)
+        bookings_response = self.client.get(reverse("admin-booking-list"))
+        summary_response = self.client.get(reverse("admin-summary"))
+
+        self.assertEqual(bookings_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(bookings_response.data), 1)
+        self.assertEqual(summary_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(summary_response.data["total_bookings"], 1)
+
 
 class SeatHoldConcurrencyTests(TransactionTestCase):
     reset_sequences = True

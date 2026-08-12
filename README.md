@@ -70,6 +70,8 @@ Running `seed_data` creates or refreshes these local accounts:
 | Customer | `demo_customer` | `Customer@12345` |
 | Operator | `demo_operator` | `Operator@12345` |
 
+The local admin created during setup uses `admin / Admin@12345`.
+
 The command also creates a demo bus, two routes, two upcoming trips, and an available `TripSeat` row for every seat on each trip. It is safe to run repeatedly.
 
 ### Bus layout JSON
@@ -138,6 +140,14 @@ POST /api/bookings/{booking_reference}/cancel/
 Passenger details are collected once for each held seat. Confirmation uses a mock payment result and does not collect card data. Expired holds are released lazily during seat-map reads, new hold attempts, and booking reads—no background worker is required.
 
 The `BookingSeat` table also has a PostgreSQL partial unique constraint on charged seats. This is a database-level backstop against two active confirmed booking records charging the same `TripSeat`.
+
+## Role dashboards
+
+- Customers can register at `/signup`, sign in, book seats, and log out.
+- Operators sign in at `/login` and are redirected to `/operator`. Their trip queryset is restricted to buses they own, and each trip exposes a confirmed passenger manifest.
+- Admin users are redirected to `/admin-dashboard`, which shows all bookings, confirmed revenue, and occupancy. Full model editing remains available in Django admin at `http://127.0.0.1:8000/admin/`.
+
+Public signup always creates a customer. Create trusted operator accounts through Django admin and assign the `OPERATOR` role.
 
 ## Data model overview
 

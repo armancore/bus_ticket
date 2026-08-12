@@ -2,6 +2,7 @@ import axios from 'axios'
 
 const ACCESS_TOKEN_KEY = 'bus_ticket_access_token'
 const REFRESH_TOKEN_KEY = 'bus_ticket_refresh_token'
+const USER_KEY = 'bus_ticket_user'
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -58,9 +59,23 @@ export function storeTokens({ access, refresh }) {
 export function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
   window.dispatchEvent(new Event('auth:changed'))
 }
 
 export function hasAccessToken() {
   return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY))
+}
+
+export function storeCurrentUser(user) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  window.dispatchEvent(new Event('auth:changed'))
+}
+
+export function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY))
+  } catch {
+    return null
+  }
 }

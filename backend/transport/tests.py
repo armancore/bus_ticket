@@ -192,3 +192,64 @@ class PublicTripAPITests(APITestCase):
         self.assertEqual(serialized_held_seat["effective_fare"], "1200.00")
         self.assertNotIn("held_by", serialized_held_seat)
         self.assertNotContains(response, operator.username)
+
+
+class OperatorPermissionAPITests(APITestCase):
+    def setUp(self):
+        self.operator = User.objects.create_user(
+            username="manifest_operator",
+            password="StrongPass123!",
+            role=User.Role.OPERATOR,
+        )
+        self.other_operator = User.objects.create_user(
+            username="other_manifest_operator",
+            password="StrongPass123!",
+            role=User.Role.OPERATOR,
+        )
+        route = Route.objects.create(
+            origin="Kathmandu",
+            destination="Pokhara",
+            distance=Decimal("200.00"),
+            estimated_duration=timedelta(hours=7),
+        )
+        departure = timezone.now() + timedelta(days=2)
+        self.own_trip = Trip.objects.create(
+            bus=Bus.objects.create(
+                operator=self.operator,
+                name="Owned Bus",
+                plate_number="OWNED-1",
+                bus_type="AC",
+                layout=SIMPLE_LAYOUT,
+            ),
+            route=route,
+            departure_datetime=departure,
+            arrival_datetime=departure + timedelta(hours=7),
+            base_fare=Decimal("1000.00"),
+        )
+        self.other_trip = Trip.objects.create(
+            bus=Bus.objects.create(
+                operator=self.other_operator,
+                name="Other Bus",
+                plate_number="OTHER-1",
+                bus_type="AC",
+                layout=SIMPLE_LAYOUT,
+            ),
+            route=route,
+            departure_datetime=departure,
+            arrival_datetime=departure + timedelta(hours=7),
+            base_fare=Decimal("1000.00"),
+        )
+        self.client.force_authenticate(self.operator)
+
+    def test_operator_trip_list_contains_only_owned_trips(self):
+        response = self.client.get(reverse("operator-trip-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([trip["id"] for trip in response.data], [self.own_trip.id])
+
+    def test_operator_cannot_access_another_operators_manifest(self):
+        response = self.client.get(
+            reverse("operator-trip-manifest", args=[self.other_trip.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

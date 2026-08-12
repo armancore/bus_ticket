@@ -4,7 +4,6 @@ import { ArrowLeft, LockKeyhole } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { login } from '../api/auth.js'
-import { clearTokens } from '../api/client.js'
 
 export function LoginPage() {
   const [form, setForm] = useState({ username: 'demo_customer', password: 'Customer@12345' })
@@ -16,11 +15,8 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: (user) => {
-      if (user.role !== 'CUSTOMER') {
-        clearTokens()
-        return
-      }
-      navigate(safeNext, { replace: true })
+      const roleHome = user.role === 'OPERATOR' ? '/operator' : user.role === 'ADMIN' ? '/admin-dashboard' : '/'
+      navigate(user.role === 'CUSTOMER' ? safeNext : roleHome, { replace: true })
     },
   })
 
@@ -29,7 +25,6 @@ export function LoginPage() {
     loginMutation.mutate(form)
   }
 
-  const roleError = loginMutation.data && loginMutation.data.role !== 'CUSTOMER'
   return (
     <main className="mx-auto grid min-h-[calc(100vh-4.5rem)] max-w-6xl items-center gap-12 px-5 py-12 sm:px-8 lg:grid-cols-2">
       <section>
@@ -50,11 +45,12 @@ export function LoginPage() {
           <span className="text-xs font-bold tracking-wider text-stone-500 uppercase">Password</span>
           <input type="password" value={form.password} onChange={(event) => setForm({...form, password: event.target.value})} autoComplete="current-password" required className="mt-2 w-full border-b border-stone-300 bg-transparent py-3 text-lg outline-none focus:border-signal" />
         </label>
-        {(loginMutation.isError || roleError) && <p className="mt-5 text-sm font-semibold text-red-700" role="alert">{roleError ? 'Use a customer account for booking.' : 'The username or password is incorrect.'}</p>}
+        {loginMutation.isError && <p className="mt-5 text-sm font-semibold text-red-700" role="alert">The username or password is incorrect.</p>}
         <button disabled={loginMutation.isPending} className="mt-8 w-full rounded-full bg-ink px-6 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50">
           {loginMutation.isPending ? 'Signing in…' : 'Sign in and continue'}
         </button>
         <p className="mt-5 text-center text-xs text-stone-400">Demo login is filled in for local development.</p>
+        <p className="mt-3 text-center text-sm text-stone-500">New here? <Link to="/signup" className="font-bold text-signal">Create a customer account</Link></p>
       </form>
     </main>
   )

@@ -98,3 +98,12 @@ class BookingSerializer(serializers.ModelSerializer):
             if record.trip_seat.held_until is not None
         ]
         return min(expiries) if expiries else None
+
+
+class AdminSummarySerializer(serializers.Serializer):
+    total_bookings = serializers.IntegerField()
+    confirmed_bookings = serializers.IntegerField()
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    booked_seats = serializers.IntegerField()
+    total_trip_seats = serializers.IntegerField()
+    occupancy_rate = serializers.DecimalField(max_digits=5, decimal_places=2)

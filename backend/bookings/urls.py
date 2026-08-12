@@ -6,10 +6,14 @@ from .views import (
     CancelBookingView,
     ConfirmBookingView,
     HoldSeatsView,
+    AdminBookingListView,
+    AdminSummaryView,
 )
 
 
 urlpatterns = [
+    path("admin/summary/", AdminSummaryView.as_view(), name="admin-summary"),
+    path("admin/all/", AdminBookingListView.as_view(), name="admin-booking-list"),
     path("", BookingListView.as_view(), name="booking-list"),
     path("hold/", HoldSeatsView.as_view(), name="hold-seats"),
     path("<str:booking_reference>/", BookingDetailView.as_view(), name="booking-detail"),
