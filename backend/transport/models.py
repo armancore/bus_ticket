@@ -145,6 +145,15 @@ class TripSeat(models.Model):
         HELD = "HELD", "Held"
         BOOKED = "BOOKED", "Booked"
 
+    class QuerySet(models.QuerySet):
+        def expired_holds(self, at=None):
+            from django.utils import timezone
+
+            return self.filter(
+                status=TripSeat.Status.HELD,
+                held_until__lte=at or timezone.now(),
+            )
+
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="seats")
     seat_code = models.CharField(max_length=20)
     status = models.CharField(
@@ -167,6 +176,7 @@ class TripSeat(models.Model):
         blank=True,
         validators=[MinValueValidator(Decimal("0.00"))],
     )
+    objects = QuerySet.as_manager()
 
     class Meta:
         ordering = ["id"]

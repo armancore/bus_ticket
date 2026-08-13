@@ -7,20 +7,18 @@ from rest_framework.response import Response
 
 from .models import Booking
 from .permissions import IsCustomer
-from .serializers import BookingSerializer, ConfirmBookingSerializer, HoldSeatsSerializer
+from .serializers import BookingSerializer, HoldSeatsSerializer, PassengerDetailsSerializer
 from .serializers import AdminSummarySerializer
 from transport.models import TripSeat
 from transport.permissions import IsAdminRole
 from .services import (
     BookingStateError,
-    HoldExpiredError,
-    MockPaymentFailedError,
     SeatConflictError,
     cancel_booking,
-    confirm_booking,
     expire_booking_if_needed,
     hold_seats,
 )
+from .esewa import EsewaPaymentError, save_passenger_details
 
 
 def customer_booking_queryset(customer):
@@ -66,33 +64,22 @@ class HoldSeatsView(generics.GenericAPIView):
         )
 
 
-class ConfirmBookingView(generics.GenericAPIView):
+class PassengerDetailsView(generics.GenericAPIView):
     permission_classes = [IsCustomer]
-    serializer_class = ConfirmBookingSerializer
+    serializer_class = PassengerDetailsSerializer
 
     def post(self, request, booking_reference):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            booking = confirm_booking(
+            booking = save_passenger_details(
                 customer=request.user,
                 booking_reference=booking_reference,
-                payment_success=serializer.validated_data["simulate_payment_success"],
                 passengers=serializer.validated_data["passengers"],
             )
         except Booking.DoesNotExist:
             return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
-        except HoldExpiredError as error:
-            return Response(
-                {"detail": str(error), "code": "hold_expired"},
-                status=status.HTTP_409_CONFLICT,
-            )
-        except MockPaymentFailedError as error:
-            return Response(
-                {"detail": str(error), "code": "payment_failed"},
-                status=status.HTTP_402_PAYMENT_REQUIRED,
-            )
-        except BookingStateError as error:
+        except EsewaPaymentError as error:
             return Response(
                 {"detail": str(error), "code": "invalid_booking_state"},
                 status=status.HTTP_409_CONFLICT,

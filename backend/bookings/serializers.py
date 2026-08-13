@@ -30,15 +30,28 @@ class PassengerSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=BookingSeat.Gender.choices)
 
 
-class ConfirmBookingSerializer(serializers.Serializer):
+class PassengerDetailsSerializer(serializers.Serializer):
     passengers = PassengerSerializer(many=True, allow_empty=False)
-    simulate_payment_success = serializers.BooleanField(default=True)
 
     def validate_passengers(self, value):
         codes = [passenger["seat_code"].strip().upper() for passenger in value]
         if len(codes) != len(set(codes)):
             raise serializers.ValidationError("Passenger seat codes must be unique.")
         return value
+
+
+class InitiateEsewaSerializer(serializers.Serializer):
+    booking_id = serializers.IntegerField(min_value=1)
+
+
+class EsewaInitiationResponseSerializer(serializers.Serializer):
+    form_url = serializers.URLField()
+    fields = serializers.DictField(child=serializers.CharField())
+
+
+class EsewaVerificationResponseSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    booking_reference = serializers.CharField()
 
 
 class BookingSeatReadSerializer(serializers.ModelSerializer):

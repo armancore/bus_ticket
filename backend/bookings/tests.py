@@ -84,58 +84,6 @@ class BookingFlowAPITests(APITestCase):
             format="json",
         )
 
-    def test_customer_can_hold_and_confirm_seat_with_mock_payment(self):
-        hold_response = self.hold()
-
-        self.assertEqual(hold_response.status_code, status.HTTP_201_CREATED)
-        reference = hold_response.data["booking_reference"]
-        seat = self.trip.seats.get(seat_code="A1")
-        self.assertEqual(seat.status, TripSeat.Status.HELD)
-        self.assertEqual(seat.held_by, self.customer)
-
-        confirm_response = self.client.post(
-            reverse("confirm-booking", args=[reference]),
-            {
-                "passengers": [
-                    {
-                        "seat_code": "A1",
-                        "passenger_name": "Demo Passenger",
-                        "age": 24,
-                        "gender": "OTHER",
-                    }
-                ],
-                "simulate_payment_success": True,
-            },
-            format="json",
-        )
-
-        self.assertEqual(confirm_response.status_code, status.HTTP_200_OK)
-        seat.refresh_from_db()
-        booking = Booking.objects.get(booking_reference=reference)
-        self.assertEqual(seat.status, TripSeat.Status.BOOKED)
-        self.assertIsNone(seat.held_by)
-        self.assertEqual(booking.status, Booking.Status.CONFIRMED)
-        self.assertEqual(booking.seats.get().fare_charged, Decimal("1200.00"))
-        self.assertEqual(booking.payments.get().status, Payment.Status.PAID)
-
-        retry_response = self.client.post(
-            reverse("confirm-booking", args=[reference]),
-            {
-                "passengers": [
-                    {
-                        "seat_code": "A1",
-                        "passenger_name": "Demo Passenger",
-                        "age": 24,
-                        "gender": "OTHER",
-                    }
-                ],
-                "simulate_payment_success": True,
-            },
-            format="json",
-        )
-        self.assertEqual(retry_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(booking.payments.count(), 1)
-
     def test_expired_hold_is_released_lazily_for_another_customer(self):
         first_hold = self.hold()
         first_booking = Booking.objects.get(
@@ -189,32 +137,6 @@ class BookingFlowAPITests(APITestCase):
         self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
         self.assertEqual(cancel_response.data["status"], Booking.Status.CANCELLED)
         self.assertEqual(self.trip.seats.get(seat_code="A1").status, TripSeat.Status.AVAILABLE)
-
-    def test_failed_mock_payment_keeps_seat_held_for_retry(self):
-        response = self.hold()
-        reference = response.data["booking_reference"]
-
-        payment_response = self.client.post(
-            reverse("confirm-booking", args=[reference]),
-            {
-                "passengers": [
-                    {
-                        "seat_code": "A1",
-                        "passenger_name": "Demo Passenger",
-                        "age": 24,
-                        "gender": "OTHER",
-                    }
-                ],
-                "simulate_payment_success": False,
-            },
-            format="json",
-        )
-
-        self.assertEqual(payment_response.status_code, status.HTTP_402_PAYMENT_REQUIRED)
-        booking = Booking.objects.get(booking_reference=reference)
-        self.assertEqual(booking.status, Booking.Status.PENDING)
-        self.assertEqual(self.trip.seats.get(seat_code="A1").status, TripSeat.Status.HELD)
-        self.assertEqual(booking.payments.get().status, Payment.Status.FAILED)
 
     def test_database_rejects_second_charged_record_for_same_trip_seat(self):
         first_hold = self.hold()

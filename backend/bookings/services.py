@@ -1,15 +1,13 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db import IntegrityError, transaction
+from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from transport.models import Trip, TripSeat
 
-from .models import Booking, BookingSeat, Payment
-
-
-HOLD_DURATION = timedelta(minutes=10)
+from .models import Booking, BookingSeat
 
 
 class SeatConflictError(Exception):
@@ -18,15 +16,7 @@ class SeatConflictError(Exception):
         super().__init__("One or more seats are no longer available.")
 
 
-class HoldExpiredError(Exception):
-    pass
-
-
 class BookingStateError(Exception):
-    pass
-
-
-class MockPaymentFailedError(Exception):
     pass
 
 
@@ -76,7 +66,7 @@ def hold_seats(*, customer, trip_id, seat_codes):
                 status=Booking.Status.EXPIRED
             )
 
-        held_until = now + HOLD_DURATION
+        held_until = now + timedelta(minutes=settings.BOOKING_HOLD_MINUTES)
         total_amount = sum((seat.effective_fare for seat in seats), Decimal("0.00"))
         booking = Booking.objects.create(
             customer=customer,
@@ -93,93 +83,6 @@ def hold_seats(*, customer, trip_id, seat_codes):
         )
 
     return booking, held_until
-
-
-def confirm_booking(*, customer, booking_reference, passengers, payment_success=True):
-    passenger_by_code = {
-        passenger["seat_code"].strip().upper(): passenger for passenger in passengers
-    }
-    expired = False
-    payment_failed = False
-
-    with transaction.atomic():
-        booking, booking_records, seats = _lock_booking_and_seats(
-            customer=customer,
-            booking_reference=booking_reference,
-        )
-        if booking.status == Booking.Status.CONFIRMED:
-            return booking
-        if booking.status != Booking.Status.PENDING:
-            raise BookingStateError(
-                f"A {booking.status.lower()} booking cannot be confirmed."
-            )
-
-        expected_codes = {seat.seat_code for seat in seats}
-        if set(passenger_by_code) != expected_codes:
-            raise BookingStateError("Passenger details must match every held seat exactly.")
-
-        now = timezone.now()
-        invalid_hold = any(
-            seat.status != TripSeat.Status.HELD
-            or seat.held_by_id != customer.id
-            or seat.held_until is None
-            or seat.held_until <= now
-            for seat in seats
-        )
-        if invalid_hold:
-            _expire_locked_booking(booking, seats, customer.id)
-            expired = True
-        elif not payment_success:
-            Payment.objects.create(
-                booking=booking,
-                amount=booking.total_amount,
-                status=Payment.Status.FAILED,
-                gateway="mock",
-            )
-            payment_failed = True
-        else:
-            seat_by_id = {seat.id: seat for seat in seats}
-            for record in booking_records:
-                seat = seat_by_id[record.trip_seat_id]
-                passenger = passenger_by_code[seat.seat_code]
-                record.passenger_name = passenger["passenger_name"].strip()
-                record.age = passenger["age"]
-                record.gender = passenger["gender"]
-                record.fare_charged = seat.effective_fare
-
-            try:
-                BookingSeat.objects.bulk_update(
-                    booking_records,
-                    ["passenger_name", "age", "gender", "fare_charged"],
-                )
-            except IntegrityError as error:
-                raise BookingStateError("A selected seat was already booked.") from error
-
-            for seat in seats:
-                seat.status = TripSeat.Status.BOOKED
-                seat.held_until = None
-                seat.held_by = None
-            TripSeat.objects.bulk_update(seats, ["status", "held_until", "held_by"])
-
-            booking.total_amount = sum(
-                (record.fare_charged for record in booking_records),
-                Decimal("0.00"),
-            )
-            booking.status = Booking.Status.CONFIRMED
-            booking.save(update_fields=["total_amount", "status"])
-            Payment.objects.create(
-                booking=booking,
-                amount=booking.total_amount,
-                status=Payment.Status.PAID,
-                gateway="mock",
-                verified_at=now,
-            )
-
-    if expired:
-        raise HoldExpiredError("Your 10-minute seat hold has expired.")
-    if payment_failed:
-        raise MockPaymentFailedError("Mock payment failed. Your seats remain held.")
-    return booking
 
 
 def cancel_booking(*, customer, booking_reference):
@@ -222,11 +125,8 @@ def expire_holds_for_trip(trip_id):
     with transaction.atomic():
         seats = list(
             TripSeat.objects.select_for_update()
-            .filter(
-                trip_id=trip_id,
-                status=TripSeat.Status.HELD,
-                held_until__lte=now,
-            )
+            .expired_holds(at=now)
+            .filter(trip_id=trip_id)
             .order_by("pk")
         )
         if not seats:
@@ -243,6 +143,16 @@ def expire_holds_for_trip(trip_id):
             seat.held_by = None
         TripSeat.objects.bulk_update(seats, ["status", "held_until", "held_by"])
     return len(seats)
+
+
+def expire_all_holds():
+    trip_ids = list(
+        TripSeat.objects.expired_holds()
+        .order_by()
+        .values_list("trip_id", flat=True)
+        .distinct()
+    )
+    return sum(expire_holds_for_trip(trip_id) for trip_id in trip_ids)
 
 
 def expire_booking_if_needed(*, customer, booking_reference):

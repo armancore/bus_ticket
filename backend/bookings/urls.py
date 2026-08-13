@@ -4,7 +4,7 @@ from .views import (
     BookingDetailView,
     BookingListView,
     CancelBookingView,
-    ConfirmBookingView,
+    PassengerDetailsView,
     HoldSeatsView,
     AdminBookingListView,
     AdminSummaryView,
@@ -18,9 +18,9 @@ urlpatterns = [
     path("hold/", HoldSeatsView.as_view(), name="hold-seats"),
     path("<str:booking_reference>/", BookingDetailView.as_view(), name="booking-detail"),
     path(
-        "<str:booking_reference>/confirm/",
-        ConfirmBookingView.as_view(),
-        name="confirm-booking",
+        "<str:booking_reference>/passengers/",
+        PassengerDetailsView.as_view(),
+        name="booking-passengers",
     ),
     path(
         "<str:booking_reference>/cancel/",
