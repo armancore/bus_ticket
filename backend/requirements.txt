@@ -6,3 +6,4 @@ django-filter==25.2
 django-environ==0.14.0
 drf-spectacular==0.30.0
 psycopg[binary]==3.3.4
+requests==2.32.5

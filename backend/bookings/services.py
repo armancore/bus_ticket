@@ -134,6 +134,7 @@ def confirm_booking(*, customer, booking_reference, passengers, payment_success=
                 booking=booking,
                 amount=booking.total_amount,
                 status=Payment.Status.FAILED,
+                gateway="mock",
             )
             payment_failed = True
         else:
@@ -169,8 +170,9 @@ def confirm_booking(*, customer, booking_reference, passengers, payment_success=
             Payment.objects.create(
                 booking=booking,
                 amount=booking.total_amount,
-                status=Payment.Status.SUCCESS,
-                paid_at=now,
+                status=Payment.Status.PAID,
+                gateway="mock",
+                verified_at=now,
             )
 
     if expired:

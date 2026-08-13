@@ -12,7 +12,7 @@ class BookingSeatInline(admin.TabularInline):
 class PaymentInline(admin.TabularInline):
     model = Payment
     extra = 0
-    readonly_fields = ("amount", "status", "transaction_reference", "paid_at")
+    readonly_fields = ("amount", "status", "transaction_uuid", "gateway", "verified_at")
 
 
 @admin.register(Booking)
@@ -34,7 +34,7 @@ class BookingSeatAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ("transaction_reference", "booking", "amount", "status", "paid_at")
-    list_filter = ("status",)
-    search_fields = ("transaction_reference", "booking__booking_reference")
-    readonly_fields = ("transaction_reference", "paid_at")
+    list_display = ("transaction_uuid", "booking", "gateway", "amount", "status", "verified_at")
+    list_filter = ("gateway", "status")
+    search_fields = ("transaction_uuid", "booking__booking_reference")
+    readonly_fields = ("transaction_uuid", "created_at", "verified_at", "raw_gateway_response")

@@ -116,7 +116,7 @@ class BookingFlowAPITests(APITestCase):
         self.assertIsNone(seat.held_by)
         self.assertEqual(booking.status, Booking.Status.CONFIRMED)
         self.assertEqual(booking.seats.get().fare_charged, Decimal("1200.00"))
-        self.assertEqual(booking.payments.get().status, Payment.Status.SUCCESS)
+        self.assertEqual(booking.payments.get().status, Payment.Status.PAID)
 
         retry_response = self.client.post(
             reverse("confirm-booking", args=[reference]),

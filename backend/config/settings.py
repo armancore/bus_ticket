@@ -121,3 +121,25 @@ CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5173"],
 )
+
+# eSewa UAT defaults are public sandbox credentials. Production values belong in .env.
+ESEWA_PRODUCT_CODE = env("ESEWA_PRODUCT_CODE", default="EPAYTEST")
+ESEWA_SECRET = env("ESEWA_SECRET", default="8gBm/:&EnhH.1/q")
+ESEWA_FORM_URL = env(
+    "ESEWA_FORM_URL",
+    default="https://rc-epay.esewa.com.np/api/epay/main/v2/form",
+)
+ESEWA_STATUS_URL = env(
+    "ESEWA_STATUS_URL",
+    default="https://rc.esewa.com.np/api/epay/transaction/status/",
+)
+ESEWA_SUCCESS_URL = env(
+    "ESEWA_SUCCESS_URL",
+    default="http://127.0.0.1:8000/api/payments/esewa/success/",
+)
+ESEWA_FAILURE_URL = env(
+    "ESEWA_FAILURE_URL",
+    default="http://127.0.0.1:8000/api/payments/esewa/failure/",
+)
+FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="http://localhost:5173")
+BOOKING_HOLD_MINUTES = env.int("BOOKING_HOLD_MINUTES", default=10)

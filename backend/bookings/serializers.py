@@ -67,7 +67,7 @@ class BookingSeatReadSerializer(serializers.ModelSerializer):
 class PaymentReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
-        fields = ("amount", "status", "transaction_reference", "paid_at")
+        fields = ("amount", "status", "transaction_uuid", "gateway", "verified_at")
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -79,6 +79,7 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = (
+            "id",
             "booking_reference",
             "status",
             "total_amount",

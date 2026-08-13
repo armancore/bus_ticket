@@ -1,4 +1,5 @@
 import secrets
+import uuid
 from decimal import Decimal
 
 from django.conf import settings
@@ -14,6 +15,7 @@ def generate_booking_reference():
 
 
 def generate_transaction_reference():
+    """Kept only because the historical initial migration imports this helper."""
     return f"PAY{secrets.token_hex(6).upper()}"
 
 
@@ -118,24 +120,27 @@ class BookingSeat(models.Model):
 
 class Payment(models.Model):
     class Status(models.TextChoices):
+        INITIATED = "INITIATED", "Initiated"
         PENDING = "PENDING", "Pending"
-        SUCCESS = "SUCCESS", "Success"
+        PAID = "PAID", "Paid"
         FAILED = "FAILED", "Failed"
 
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT, related_name="payments")
+    transaction_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.00"))],
     )
-    status = models.CharField(max_length=7, choices=Status.choices)
-    transaction_reference = models.CharField(
-        max_length=15,
-        unique=True,
-        default=generate_transaction_reference,
-        editable=False,
+    status = models.CharField(
+        max_length=9,
+        choices=Status.choices,
+        default=Status.INITIATED,
     )
-    paid_at = models.DateTimeField(null=True, blank=True)
+    gateway = models.CharField(max_length=20, default="esewa")
+    raw_gateway_response = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-id"]
@@ -143,8 +148,13 @@ class Payment(models.Model):
             models.CheckConstraint(
                 condition=Q(amount__gte=0),
                 name="payment_amount_non_negative",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["booking"],
+                condition=Q(status="PAID"),
+                name="one_paid_attempt_per_booking",
+            ),
         ]
 
     def __str__(self):
-        return self.transaction_reference
+        return str(self.transaction_uuid)
