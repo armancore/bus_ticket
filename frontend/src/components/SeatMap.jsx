@@ -48,7 +48,7 @@ export function SeatMap({
         <div>
           <p className="text-xs font-bold tracking-[0.16em] text-signal uppercase">Live availability</p>
           <h2 id="seat-map-heading" className="mt-2 font-display text-3xl sm:text-4xl">Choose where you’ll sit</h2>
-          <p className="mt-2 text-sm text-stone-500">Select available seats, then hold them for 10 minutes while you add passenger details.</p>
+          <p className="mt-2 text-sm text-stone-500">Select available seats, then use the live countdown while you add passenger details.</p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold text-moss">{availableCount}</p>

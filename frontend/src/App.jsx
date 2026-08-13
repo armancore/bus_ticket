@@ -14,6 +14,8 @@ const AdminDashboardPage = lazyPage(() => import('./pages/AdminDashboardPage.jsx
 const MyBookingsPage = lazyPage(() => import('./pages/MyBookingsPage.jsx'), 'MyBookingsPage')
 const TicketPage = lazyPage(() => import('./pages/TicketPage.jsx'), 'TicketPage')
 const NotFoundPage = lazyPage(() => import('./pages/NotFoundPage.jsx'), 'NotFoundPage')
+const PaymentSuccessPage = lazyPage(() => import('./pages/PaymentSuccessPage.jsx'), 'PaymentSuccessPage')
+const PaymentFailurePage = lazyPage(() => import('./pages/PaymentFailurePage.jsx'), 'PaymentFailurePage')
 
 export default function App() {
   return (
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/bookings/:reference/passengers" element={<PassengerDetailsPage />} />
           <Route path="/bookings/:reference/confirmed" element={<BookingConfirmationPage />} />
           <Route path="/tickets/:reference" element={<TicketPage />} />
+          <Route path="/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/payment/failure" element={<PaymentFailurePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ArrowLeft, Clock3, CreditCard } from 'lucide-react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { AlertTriangle, ArrowLeft, Clock3, CreditCard, ExternalLink } from 'lucide-react'
+import { Link, Navigate, useParams } from 'react-router-dom'
 
-import { confirmBooking, getBooking } from '../api/bookings.js'
+import { getBooking, initiateEsewaPayment, savePassengerDetails } from '../api/bookings.js'
 import { hasAccessToken } from '../api/client.js'
 import { formatCurrency } from '../utils/formatters.js'
 import { QueryError } from '../components/QueryError.jsx'
@@ -19,10 +19,9 @@ export function PassengerDetailsPage() {
 }
 
 function PassengerForm({ booking }) {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const remainingSeconds = useCountdown(booking.hold_expires_at)
-  const [simulateFailure, setSimulateFailure] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
   const [validationError, setValidationError] = useState('')
   const [passengers, setPassengers] = useState(() => booking.seats.map((seat) => ({
     seat_code: seat.seat_code,
@@ -31,11 +30,18 @@ function PassengerForm({ booking }) {
     gender: '',
   })))
 
-  const confirmMutation = useMutation({
-    mutationFn: confirmBooking,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trip-seat-map', String(booking.trip.id)] })
-      navigate(`/bookings/${booking.booking_reference}/confirmed`)
+  const paymentMutation = useMutation({
+    mutationFn: async (passengerPayload) => {
+      await savePassengerDetails({
+        reference: booking.booking_reference,
+        passengers: passengerPayload,
+      })
+      return initiateEsewaPayment(booking.id)
+    },
+    onSuccess: (paymentForm) => {
+      setRedirecting(true)
+      queryClient.invalidateQueries({ queryKey: ['booking', booking.booking_reference] })
+      window.setTimeout(() => submitGatewayForm(paymentForm), 100)
     },
   })
 
@@ -51,15 +57,24 @@ function PassengerForm({ booking }) {
       setValidationError('Complete valid passenger details for every selected seat.')
       return
     }
-    confirmMutation.mutate({
-      reference: booking.booking_reference,
-      passengers: passengers.map((passenger) => ({...passenger, age: Number(passenger.age)})),
-      simulatePaymentSuccess: !simulateFailure,
-    })
+    paymentMutation.mutate(
+      passengers.map((passenger) => ({...passenger, age: Number(passenger.age)})),
+    )
   }
 
   const expired = booking.status === 'EXPIRED' || remainingSeconds <= 0
-  const apiError = confirmMutation.error?.response?.data
+  const apiError = paymentMutation.error?.response?.data
+
+  if (redirecting) {
+    return (
+      <main className="mx-auto max-w-3xl px-5 py-24 text-center sm:px-8" role="status">
+        <span className="mx-auto grid size-16 place-items-center rounded-full bg-[#60bb46] text-white"><ExternalLink size={26} /></span>
+        <p className="mt-7 text-xs font-bold tracking-[0.16em] text-[#38852b] uppercase">Secure payment handoff</p>
+        <h1 className="mt-3 font-display text-4xl sm:text-5xl">Redirecting to eSewa…</h1>
+        <p className="mt-4 text-stone-500">Do not close this tab. You will return here after eSewa verifies the payment.</p>
+      </main>
+    )
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-16">
@@ -87,15 +102,14 @@ function PassengerForm({ booking }) {
 
           <section className="mt-10 grid gap-8 border-y border-stone-300 py-8 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <div className="flex items-center gap-3"><CreditCard className="text-moss" /><h2 className="font-display text-3xl">Mock payment</h2></div>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-stone-500">No real payment details are collected. Confirmation creates a local successful payment record.</p>
-              <label className="mt-4 flex items-center gap-3 text-sm text-stone-500"><input type="checkbox" checked={simulateFailure} onChange={(event) => setSimulateFailure(event.target.checked)} className="size-4 accent-orange-600" /> Simulate a failed payment for testing</label>
+              <div className="flex items-center gap-3"><CreditCard className="text-[#38852b]" /><h2 className="font-display text-3xl">Pay with eSewa</h2></div>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-stone-500">You will continue to the eSewa UAT checkout. The booking is confirmed only after Django verifies the transaction directly with eSewa.</p>
             </div>
             <div className="text-left md:text-right"><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Total</p><p className="mt-1 text-3xl font-bold">{formatCurrency(booking.total_amount)}</p></div>
           </section>
 
-          {(validationError || apiError) && <div className="mt-6 flex gap-3 text-sm font-semibold text-red-700" role="alert"><AlertTriangle size={18} className="shrink-0" /><p>{validationError || apiError.detail || 'Confirmation failed.'}</p></div>}
-          <div className="mt-8 flex justify-end"><button disabled={confirmMutation.isPending} className="rounded-full bg-signal px-7 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50">{confirmMutation.isPending ? 'Processing…' : `Pay ${formatCurrency(booking.total_amount)} & confirm`}</button></div>
+          {(validationError || apiError) && <div className="mt-6 flex gap-3 text-sm font-semibold text-red-700" role="alert"><AlertTriangle size={18} className="shrink-0" /><p>{validationError || apiError.detail || 'Payment could not be started.'}</p></div>}
+          <div className="mt-8 flex justify-end"><button disabled={paymentMutation.isPending} className="rounded-full bg-[#38852b] px-7 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50">{paymentMutation.isPending ? 'Preparing eSewa…' : `Pay ${formatCurrency(booking.total_amount)} with eSewa`}</button></div>
         </form>
       )}
     </main>
@@ -138,4 +152,20 @@ function useCountdown(expiresAt) {
     }
   }, [expiresAt])
   return remainingSeconds
+}
+
+function submitGatewayForm({ form_url: formUrl, fields }) {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = formUrl
+  form.hidden = true
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    form.appendChild(input)
+  })
+  document.body.appendChild(form)
+  form.submit()
 }

@@ -30,7 +30,7 @@ export function TicketPage() {
 }
 
 function ConfirmedTicket({ booking }) {
-  const payment = booking.payments.find((item) => item.status === 'SUCCESS')
+  const payment = booking.payments.find((item) => item.status === 'PAID')
   return (
     <main className="ticket-page mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
       <div className="ticket-actions mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -64,7 +64,7 @@ function ConfirmedTicket({ booking }) {
               </div>
             </section>
 
-            <div className="flex flex-wrap justify-between gap-5 border-t border-dashed border-stone-300 pt-6 text-sm"><div><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Payment</p><p className="mt-2 font-mono font-bold">{payment?.transaction_reference || 'CONFIRMED'}</p></div><div className="text-right"><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Total paid</p><p className="mt-2 text-2xl font-bold">{formatCurrency(booking.total_amount)}</p></div></div>
+            <div className="flex flex-wrap justify-between gap-5 border-t border-dashed border-stone-300 pt-6 text-sm"><div><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">eSewa transaction</p><p className="mt-2 font-mono text-xs font-bold">{payment?.transaction_uuid || 'CONFIRMED'}</p></div><div className="text-right"><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Total paid</p><p className="mt-2 text-2xl font-bold">{formatCurrency(booking.total_amount)}</p></div></div>
           </div>
 
           <aside className="flex flex-col items-center justify-center border-t border-dashed border-stone-300 bg-stone-50 px-6 py-8 text-center lg:border-t-0 lg:border-l">

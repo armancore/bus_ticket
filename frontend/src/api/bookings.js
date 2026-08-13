@@ -18,10 +18,16 @@ export async function getMyBookings() {
   return response.data
 }
 
-export async function confirmBooking({ reference, passengers, simulatePaymentSuccess }) {
-  const response = await apiClient.post(`/bookings/${reference}/confirm/`, {
+export async function savePassengerDetails({ reference, passengers }) {
+  const response = await apiClient.post(`/bookings/${reference}/passengers/`, {
     passengers,
-    simulate_payment_success: simulatePaymentSuccess,
+  })
+  return response.data
+}
+
+export async function initiateEsewaPayment(bookingId) {
+  const response = await apiClient.post('/payments/esewa/initiate/', {
+    booking_id: bookingId,
   })
   return response.data
 }

@@ -90,7 +90,7 @@ export function SearchPage() {
 
         <div className="mt-10 flex items-center gap-3 text-sm text-stone-500">
           <ShieldCheck size={18} className="text-moss" aria-hidden="true" />
-          Seat holds will be protected for 10 minutes while you enter passenger details.
+          Seat holds stay protected during the countdown while you enter passenger details.
         </div>
       </section>
     </main>
