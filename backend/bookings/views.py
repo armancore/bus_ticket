@@ -5,7 +5,7 @@ from decimal import Decimal
 from rest_framework import generics, status
 from rest_framework.response import Response
 
-from .models import Booking
+from .models import Booking, Payment
 from .permissions import IsCustomer
 from .serializers import BookingSerializer, HoldSeatsSerializer, PassengerDetailsSerializer
 from .serializers import AdminSummarySerializer
@@ -15,6 +15,7 @@ from .services import (
     BookingStateError,
     SeatConflictError,
     cancel_booking,
+    confirm_counter_booking,
     expire_booking_if_needed,
     hold_seats,
 )
@@ -80,6 +81,26 @@ class PassengerDetailsView(generics.GenericAPIView):
         except Booking.DoesNotExist:
             return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
         except EsewaPaymentError as error:
+            return Response(
+                {"detail": str(error), "code": "invalid_booking_state"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(BookingSerializer(booking, context={"request": request}).data)
+
+
+class ConfirmCounterBookingView(generics.GenericAPIView):
+    permission_classes = [IsCustomer]
+    serializer_class = BookingSerializer
+
+    def post(self, request, booking_reference):
+        try:
+            booking = confirm_counter_booking(
+                customer=request.user,
+                booking_reference=booking_reference,
+            )
+        except Booking.DoesNotExist:
+            return Response({"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+        except BookingStateError as error:
             return Response(
                 {"detail": str(error), "code": "invalid_booking_state"},
                 status=status.HTTP_409_CONFLICT,
@@ -161,8 +182,8 @@ class AdminSummaryView(generics.GenericAPIView):
 
     def get(self, request):
         confirmed = Booking.objects.filter(status=Booking.Status.CONFIRMED)
-        revenue = confirmed.aggregate(
-            value=Coalesce(Sum("total_amount"), Decimal("0.00"))
+        revenue = Payment.objects.filter(status=Payment.Status.PAID).aggregate(
+            value=Coalesce(Sum("amount"), Decimal("0.00"))
         )["value"]
         booked_seats = TripSeat.objects.filter(status=TripSeat.Status.BOOKED).count()
         total_trip_seats = TripSeat.objects.count()

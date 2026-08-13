@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from transport.models import Trip, TripSeat
 
-from .models import Booking, BookingSeat
+from .models import Booking, BookingSeat, Payment
 
 
 class SeatConflictError(Exception):
@@ -117,6 +117,72 @@ def cancel_booking(*, customer, booking_reference):
         BookingSeat.objects.bulk_update(booking_records, ["fare_charged"])
         booking.status = Booking.Status.CANCELLED
         booking.save(update_fields=["status"])
+        booking.payments.filter(
+            status__in=[Payment.Status.INITIATED, Payment.Status.PENDING]
+        ).update(status=Payment.Status.FAILED, verified_at=timezone.now())
+    return booking
+
+
+def confirm_counter_booking(*, customer, booking_reference):
+    """Confirm held seats while leaving payment due at the bus counter."""
+    with transaction.atomic():
+        booking, records, seats = _lock_booking_and_seats(
+            customer=customer,
+            booking_reference=booking_reference,
+        )
+        existing_payment = booking.payments.filter(gateway="counter").first()
+        if booking.status == Booking.Status.CONFIRMED and existing_payment:
+            return booking
+        if booking.status != Booking.Status.PENDING:
+            raise BookingStateError(
+                f"A {booking.status.lower()} booking cannot be confirmed."
+            )
+
+        now = timezone.now()
+        valid_hold = all(
+            seat.status == TripSeat.Status.HELD
+            and seat.held_by_id == customer.id
+            and seat.held_until is not None
+            and seat.held_until > now
+            for seat in seats
+        )
+        if not valid_hold:
+            raise BookingStateError("The seat hold has expired or is no longer available.")
+        if any(
+            not record.passenger_name or record.age is None or not record.gender
+            for record in records
+        ):
+            raise BookingStateError("Complete passenger details before booking.")
+
+        seat_by_id = {seat.id: seat for seat in seats}
+        total = sum((seat.effective_fare for seat in seats), Decimal("0.00"))
+        for record in records:
+            record.fare_charged = seat_by_id[record.trip_seat_id].effective_fare
+        try:
+            BookingSeat.objects.bulk_update(records, ["fare_charged"])
+        except IntegrityError as error:
+            raise BookingStateError("A selected seat was already booked.") from error
+
+        for seat in seats:
+            seat.status = TripSeat.Status.BOOKED
+            seat.held_until = None
+            seat.held_by = None
+        TripSeat.objects.bulk_update(seats, ["status", "held_until", "held_by"])
+
+        booking.total_amount = total
+        booking.status = Booking.Status.CONFIRMED
+        booking.save(update_fields=["total_amount", "status"])
+        booking.payments.filter(
+            gateway="esewa",
+            status__in=[Payment.Status.INITIATED, Payment.Status.PENDING],
+        ).update(status=Payment.Status.FAILED, verified_at=timezone.now())
+        Payment.objects.create(
+            booking=booking,
+            amount=total,
+            status=Payment.Status.PENDING,
+            gateway="counter",
+            raw_gateway_response={"note": "Payment due at the bus counter."},
+        )
     return booking
 
 

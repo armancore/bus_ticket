@@ -4,6 +4,7 @@ from .views import (
     BookingDetailView,
     BookingListView,
     CancelBookingView,
+    ConfirmCounterBookingView,
     PassengerDetailsView,
     HoldSeatsView,
     AdminBookingListView,
@@ -26,5 +27,10 @@ urlpatterns = [
         "<str:booking_reference>/cancel/",
         CancelBookingView.as_view(),
         name="cancel-booking",
+    ),
+    path(
+        "<str:booking_reference>/confirm-counter/",
+        ConfirmCounterBookingView.as_view(),
+        name="confirm-counter-booking",
     ),
 ]

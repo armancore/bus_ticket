@@ -32,6 +32,11 @@ export async function initiateEsewaPayment(bookingId) {
   return response.data
 }
 
+export async function confirmCounterBooking(reference) {
+  const response = await apiClient.post(`/bookings/${reference}/confirm-counter/`)
+  return response.data
+}
+
 export async function cancelBooking(reference) {
   const response = await apiClient.post(`/bookings/${reference}/cancel/`)
   return response.data

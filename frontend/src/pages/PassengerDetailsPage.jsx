@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ArrowLeft, Clock3, CreditCard, ExternalLink } from 'lucide-react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { AlertTriangle, ArrowLeft, Clock3, CreditCard, ExternalLink, TicketCheck } from 'lucide-react'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
-import { getBooking, initiateEsewaPayment, savePassengerDetails } from '../api/bookings.js'
+import { confirmCounterBooking, getBooking, initiateEsewaPayment, savePassengerDetails } from '../api/bookings.js'
 import { hasAccessToken } from '../api/client.js'
 import { formatCurrency } from '../utils/formatters.js'
 import { QueryError } from '../components/QueryError.jsx'
@@ -20,6 +20,7 @@ export function PassengerDetailsPage() {
 
 function PassengerForm({ booking }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const remainingSeconds = useCountdown(booking.hold_expires_at)
   const [redirecting, setRedirecting] = useState(false)
   const [validationError, setValidationError] = useState('')
@@ -45,25 +46,48 @@ function PassengerForm({ booking }) {
     },
   })
 
+  const counterMutation = useMutation({
+    mutationFn: async (passengerPayload) => {
+      await savePassengerDetails({
+        reference: booking.booking_reference,
+        passengers: passengerPayload,
+      })
+      return confirmCounterBooking(booking.booking_reference)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking', booking.booking_reference] })
+      queryClient.invalidateQueries({ queryKey: ['bookings'] })
+      navigate(`/bookings/${booking.booking_reference}/confirmed`)
+    },
+  })
+
   function updatePassenger(index, field, value) {
     setValidationError('')
     setPassengers((current) => current.map((passenger, itemIndex) => itemIndex === index ? {...passenger, [field]: value} : passenger))
   }
 
+  function passengerPayload() {
+    return passengers.map((passenger) => ({...passenger, age: Number(passenger.age)}))
+  }
+
+  function validatePassengers() {
+    const invalid = passengers.some((passenger) => passenger.passenger_name.trim().length < 2 || Number(passenger.age) < 1 || Number(passenger.age) > 120 || !passenger.gender)
+    if (invalid) setValidationError('Complete valid passenger details for every selected seat.')
+    return !invalid
+  }
+
   function handleSubmit(event) {
     event.preventDefault()
-    const invalid = passengers.some((passenger) => passenger.passenger_name.trim().length < 2 || Number(passenger.age) < 1 || Number(passenger.age) > 120 || !passenger.gender)
-    if (invalid) {
-      setValidationError('Complete valid passenger details for every selected seat.')
-      return
-    }
-    paymentMutation.mutate(
-      passengers.map((passenger) => ({...passenger, age: Number(passenger.age)})),
-    )
+    if (validatePassengers()) paymentMutation.mutate(passengerPayload())
+  }
+
+  function handleCounterBooking() {
+    if (validatePassengers()) counterMutation.mutate(passengerPayload())
   }
 
   const expired = booking.status === 'EXPIRED' || remainingSeconds <= 0
-  const apiError = paymentMutation.error?.response?.data
+  const apiError = (paymentMutation.error || counterMutation.error)?.response?.data
+  const submitting = paymentMutation.isPending || counterMutation.isPending
 
   if (redirecting) {
     return (
@@ -108,8 +132,16 @@ function PassengerForm({ booking }) {
             <div className="text-left md:text-right"><p className="text-xs font-bold tracking-wider text-stone-400 uppercase">Total</p><p className="mt-1 text-3xl font-bold">{formatCurrency(booking.total_amount)}</p></div>
           </section>
 
-          {(validationError || apiError) && <div className="mt-6 flex gap-3 text-sm font-semibold text-red-700" role="alert"><AlertTriangle size={18} className="shrink-0" /><p>{validationError || apiError.detail || 'Payment could not be started.'}</p></div>}
-          <div className="mt-8 flex justify-end"><button disabled={paymentMutation.isPending} className="rounded-full bg-[#38852b] px-7 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50">{paymentMutation.isPending ? 'Preparing eSewa…' : `Pay ${formatCurrency(booking.total_amount)} with eSewa`}</button></div>
+          <section className="mt-6 grid gap-5 rounded-2xl border border-orange-200 bg-orange-50 p-6 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <div className="flex items-center gap-3"><TicketCheck className="text-signal" /><h2 className="font-display text-2xl">Reserve now, pay at counter</h2></div>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600">Your seats will be booked immediately. Pay {formatCurrency(booking.total_amount)} at the bus counter before departure.</p>
+            </div>
+            <button type="button" onClick={handleCounterBooking} disabled={submitting} className="rounded-full border border-signal px-6 py-3 font-bold text-signal transition-colors hover:bg-signal hover:text-white disabled:opacity-50">{counterMutation.isPending ? 'Booking seats…' : 'Book without eSewa'}</button>
+          </section>
+
+          {(validationError || apiError) && <div className="mt-6 flex gap-3 text-sm font-semibold text-red-700" role="alert"><AlertTriangle size={18} className="shrink-0" /><p>{validationError || apiError.detail || 'The booking could not be completed.'}</p></div>}
+          <div className="mt-8 flex justify-end"><button disabled={submitting} className="rounded-full bg-[#38852b] px-7 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50">{paymentMutation.isPending ? 'Preparing eSewa…' : `Pay ${formatCurrency(booking.total_amount)} with eSewa`}</button></div>
         </form>
       )}
     </main>

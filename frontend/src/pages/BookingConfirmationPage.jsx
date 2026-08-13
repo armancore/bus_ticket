@@ -15,6 +15,7 @@ export function BookingConfirmationPage() {
   if (bookingQuery.isError) return <main className="mx-auto max-w-4xl px-5 py-16 sm:px-8"><QueryError title="Confirmation could not be loaded" message="Check your connection or open the booking from your account." onRetry={() => bookingQuery.refetch()} /><Link to="/bookings" className="font-bold text-signal">My bookings</Link></main>
   const booking = bookingQuery.data
   if (booking.status !== 'CONFIRMED') return <Navigate to={`/bookings/${reference}/passengers`} replace />
+  const paidOnline = booking.payments.some((payment) => payment.status === 'PAID')
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-20">
@@ -26,9 +27,9 @@ export function BookingConfirmationPage() {
       <dl className="mt-10 grid gap-px overflow-hidden rounded-2xl bg-stone-200 sm:grid-cols-3">
         <Summary label="Departure" value={`${formatDateHeading(booking.trip.departure_datetime.slice(0, 10))}, ${formatTime(booking.trip.departure_datetime)}`} />
         <Summary label="Seats" value={booking.seats.map((seat) => seat.seat_code).join(', ')} />
-        <Summary label="Paid" value={formatCurrency(booking.total_amount)} />
+        <Summary label={paidOnline ? 'Paid online' : 'Due at counter'} value={formatCurrency(booking.total_amount)} />
       </dl>
-      <div className="mt-8 flex items-start gap-3 border-y border-stone-200 py-6 text-sm text-stone-500"><QrCode size={18} className="mt-0.5 shrink-0 text-moss" /><p>Your ticket is ready. Its QR code contains booking reference {booking.booking_reference}.</p></div>
+      <div className="mt-8 flex items-start gap-3 border-y border-stone-200 py-6 text-sm text-stone-500"><QrCode size={18} className="mt-0.5 shrink-0 text-moss" /><p>{paidOnline ? 'Your ticket is ready.' : 'Your seats are reserved. Please pay at the counter before departure.'} Its QR code contains booking reference {booking.booking_reference}.</p></div>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link to={`/tickets/${booking.booking_reference}`} className="rounded-full bg-ink px-6 py-3 font-bold text-white">View ticket</Link>
         <Link to="/" className="rounded-full border border-stone-300 px-6 py-3 font-bold text-stone-600">Search another trip</Link>

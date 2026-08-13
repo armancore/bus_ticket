@@ -138,6 +138,58 @@ class BookingFlowAPITests(APITestCase):
         self.assertEqual(cancel_response.data["status"], Booking.Status.CANCELLED)
         self.assertEqual(self.trip.seats.get(seat_code="A1").status, TripSeat.Status.AVAILABLE)
 
+    def test_customer_can_confirm_seat_for_payment_at_counter(self):
+        hold_response = self.hold()
+        reference = hold_response.data["booking_reference"]
+        passenger_response = self.client.post(
+            reverse("booking-passengers", args=[reference]),
+            {
+                "passengers": [
+                    {
+                        "seat_code": "A1",
+                        "passenger_name": "Counter Passenger",
+                        "age": 25,
+                        "gender": "OTHER",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        response = self.client.post(reverse("confirm-counter-booking", args=[reference]))
+
+        self.assertEqual(passenger_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], Booking.Status.CONFIRMED)
+        self.assertEqual(self.trip.seats.get(seat_code="A1").status, TripSeat.Status.BOOKED)
+        payment = Payment.objects.get(booking__booking_reference=reference)
+        self.assertEqual(payment.gateway, "counter")
+        self.assertEqual(payment.status, Payment.Status.PENDING)
+
+        repeated_response = self.client.post(
+            reverse("confirm-counter-booking", args=[reference])
+        )
+        self.assertEqual(repeated_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Payment.objects.filter(booking=payment.booking).count(), 1)
+
+    def test_counter_booking_requires_complete_passenger_details(self):
+        reference = self.hold().data["booking_reference"]
+
+        response = self.client.post(reverse("confirm-counter-booking", args=[reference]))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(self.trip.seats.get(seat_code="A1").status, TripSeat.Status.HELD)
+        self.assertFalse(Payment.objects.exists())
+
+    def test_customer_cannot_counter_confirm_another_customers_booking(self):
+        reference = self.hold().data["booking_reference"]
+        self.client.force_authenticate(self.other_customer)
+
+        response = self.client.post(reverse("confirm-counter-booking", args=[reference]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.trip.seats.get(seat_code="A1").status, TripSeat.Status.HELD)
+
     def test_database_rejects_second_charged_record_for_same_trip_seat(self):
         first_hold = self.hold()
         first_booking = Booking.objects.get(
