@@ -22,14 +22,75 @@ class BusSummarySerializer(serializers.ModelSerializer):
 
 
 class OperatorBusSerializer(serializers.ModelSerializer):
-    seat_count = serializers.SerializerMethodField()
+    seat_count = serializers.IntegerField(
+        min_value=4,
+        max_value=60,
+        required=False,
+        write_only=True,
+        help_text="Total seats in a 2+2 layout; must be a multiple of four.",
+    )
 
     class Meta:
         model = Bus
         fields = ("id", "name", "plate_number", "bus_type", "layout", "seat_count")
+        extra_kwargs = {"layout": {"required": False}}
 
-    def get_seat_count(self, bus) -> int:
-        return len(bus.seat_codes)
+    def validate_seat_count(self, value):
+        if value % 4:
+            raise serializers.ValidationError(
+                "Seat count must be a multiple of 4 for a 2+2 layout."
+            )
+        return value
+
+    def validate(self, attrs):
+        if not self.instance and "seat_count" not in attrs and "layout" not in attrs:
+            raise serializers.ValidationError(
+                {"seat_count": "Choose the number of seats."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        seat_count = validated_data.pop("seat_count", None)
+        if seat_count is not None:
+            validated_data["layout"] = build_two_by_two_layout(seat_count)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        seat_count = validated_data.pop("seat_count", None)
+        if seat_count is not None:
+            validated_data["layout"] = build_two_by_two_layout(seat_count)
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation["seat_count"] = len(instance.seat_codes)
+        return representation
+
+
+def build_two_by_two_layout(seat_count):
+    """Build rows with two seats, an aisle, and two seats on the other side."""
+    seats = []
+    for row in range(1, (seat_count // 4) + 1):
+        row_letter = chr(64 + row)
+        for column in range(1, 5):
+            seats.append(
+                {
+                    "code": f"{row_letter}{column}",
+                    "row": row,
+                    "column": column,
+                }
+            )
+    return {
+        "decks": [
+            {
+                "name": "LOWER",
+                "rows": seat_count // 4,
+                "columns": 4,
+                "aisle_after_columns": [2],
+                "seats": seats,
+            }
+        ]
+    }
 
 
 class TripListSerializer(serializers.ModelSerializer):

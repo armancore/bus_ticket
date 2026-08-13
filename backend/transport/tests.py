@@ -273,6 +273,45 @@ class OperatorPermissionAPITests(APITestCase):
         self.assertEqual(bus.operator, self.operator)
         self.assertEqual(response.data["seat_count"], 3)
 
+    def test_operator_can_create_two_by_two_bus_from_seat_count(self):
+        response = self.client.post(
+            reverse("operator-bus-list"),
+            {
+                "name": "Forty Seat Express",
+                "plate_number": "NEW-OP-40",
+                "bus_type": "Deluxe",
+                "seat_count": 40,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        bus = Bus.objects.get(plate_number="NEW-OP-40")
+        deck = bus.layout["decks"][0]
+        self.assertEqual(response.data["seat_count"], 40)
+        self.assertEqual(deck["rows"], 10)
+        self.assertEqual(deck["columns"], 4)
+        self.assertEqual(deck["aisle_after_columns"], [2])
+        self.assertEqual(
+            [(seat["row"], seat["column"]) for seat in deck["seats"][:4]],
+            [(1, 1), (1, 2), (1, 3), (1, 4)],
+        )
+
+    def test_operator_bus_seat_count_must_make_complete_two_by_two_rows(self):
+        response = self.client.post(
+            reverse("operator-bus-list"),
+            {
+                "name": "Invalid Seat Bus",
+                "plate_number": "INVALID-SEATS",
+                "bus_type": "Deluxe",
+                "seat_count": 42,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("seat_count", response.data)
+
     def test_operator_cannot_read_update_or_delete_another_operators_bus(self):
         url = reverse("operator-bus-detail", args=[self.other_bus.id])
 

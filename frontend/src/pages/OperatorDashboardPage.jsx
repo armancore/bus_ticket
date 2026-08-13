@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BusFront, CalendarDays, Pencil, Plus, Trash2, UsersRound, X } from 'lucide-react'
+import { Armchair, BusFront, CalendarDays, Minus, Pencil, Plus, Trash2, UsersRound, X } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 
 import {
@@ -18,24 +18,9 @@ import { getRoutes } from '../api/trips.js'
 import { getStoredUser } from '../api/client.js'
 import { formatCurrency, formatDateHeading, formatTime } from '../utils/formatters.js'
 
-const DEFAULT_LAYOUT = {
-  decks: [{
-    name: 'LOWER',
-    rows: 2,
-    columns: 5,
-    aisle_after_columns: [2],
-    seats: [
-      { code: 'A1', row: 1, column: 1 },
-      { code: 'A2', row: 1, column: 2 },
-      { code: 'A3', row: 1, column: 4 },
-      { code: 'A4', row: 1, column: 5 },
-      { code: 'B1', row: 2, column: 1 },
-      { code: 'B2', row: 2, column: 2 },
-      { code: 'B3', row: 2, column: 4 },
-      { code: 'B4', row: 2, column: 5 },
-    ],
-  }],
-}
+const MIN_SEATS = 4
+const MAX_SEATS = 60
+const DEFAULT_SEAT_COUNT = 40
 
 export function OperatorDashboardPage() {
   const user = getStoredUser()
@@ -184,34 +169,50 @@ function FleetWorkspace({ busesQuery, formItem, setFormItem, saveMutation, delet
         </div>
         {busesQuery.data?.length === 0 && <Empty label="No buses yet. Add a bus before creating a trip." />}
       </section>
-      <section>{formOpen ? <BusForm key={formItem?.id || 'new'} item={formItem} onClose={() => setFormItem(undefined)} onSave={(data) => saveMutation.mutateAsync({ item: formItem, data })} saving={saveMutation.isPending} /> : <WorkspaceHint icon={BusFront} title="Fleet details" text="Add a flexible JSON seat layout or select a bus to update its details." />}</section>
+      <section>{formOpen ? <BusForm key={formItem?.id || 'new'} item={formItem} onClose={() => setFormItem(undefined)} onSave={(data) => saveMutation.mutateAsync({ item: formItem, data })} saving={saveMutation.isPending} /> : <WorkspaceHint icon={BusFront} title="Fleet details" text="Add a bus by choosing its seat count. Every row is arranged as two seats, an aisle, and two seats." />}</section>
     </div>
   )
 }
 
 function BusForm({ item, onClose, onSave, saving }) {
-  const [form, setForm] = useState({ name: item?.name || '', plate_number: item?.plate_number || '', bus_type: item?.bus_type || '', layout: JSON.stringify(item?.layout || DEFAULT_LAYOUT, null, 2) })
-  const [localError, setLocalError] = useState('')
-  const submit = async (event) => {
-    event.preventDefault()
-    try {
-      const layout = JSON.parse(form.layout)
-      setLocalError('')
-      await onSave({ ...form, layout })
-    } catch (error) {
-      if (error instanceof SyntaxError) setLocalError('The seat layout is not valid JSON.')
-    }
-  }
+  const [form, setForm] = useState({ name: item?.name || '', plate_number: item?.plate_number || '', bus_type: item?.bus_type || '', seat_count: item?.seat_count || DEFAULT_SEAT_COUNT })
+  const changeSeatCount = (amount) => setForm((current) => ({ ...current, seat_count: Math.min(MAX_SEATS, Math.max(MIN_SEATS, Number(current.seat_count) + amount)) }))
+  const submit = (event) => { event.preventDefault(); return onSave({ ...form, seat_count: Number(form.seat_count) }) }
   return (
     <Editor title={item ? 'Edit bus' : 'Add a bus'} onClose={onClose}>
       <form onSubmit={submit} className="mt-6 space-y-5">
         <Field label="Bus name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
         <div className="grid gap-5 sm:grid-cols-2"><Field label="Plate number"><input required value={form.plate_number} onChange={(event) => setForm({ ...form, plate_number: event.target.value })} /></Field><Field label="Bus type"><input required value={form.bus_type} onChange={(event) => setForm({ ...form, bus_type: event.target.value })} /></Field></div>
-        <Field label="Seat layout JSON" help="Rows, columns, aisle positions, decks, and seat codes are data, so new layouts need no code changes."><textarea required rows="13" className="font-mono text-xs" value={form.layout} onChange={(event) => setForm({ ...form, layout: event.target.value })} /></Field>
-        {localError && <p className="text-sm font-semibold text-red-700" role="alert">{localError}</p>}
+        <div className="border-y border-stone-300 py-5">
+          <div className="flex items-end justify-between gap-5">
+            <div><p className="text-sm font-bold text-stone-700">Number of seats</p><p className="mt-1 text-xs leading-5 text-stone-500">Four seats per row: two left and two right.</p></div>
+            <div className="flex items-center gap-3" aria-label="Choose number of seats">
+              <button type="button" onClick={() => changeSeatCount(-4)} disabled={form.seat_count <= MIN_SEATS} aria-label="Remove four seats" className="rounded-full border border-stone-300 p-2 text-stone-600 disabled:opacity-30"><Minus size={16} /></button>
+              <output className="min-w-12 text-center font-display text-3xl" aria-live="polite">{form.seat_count}</output>
+              <button type="button" onClick={() => changeSeatCount(4)} disabled={form.seat_count >= MAX_SEATS} aria-label="Add four seats" className="rounded-full border border-stone-300 p-2 text-stone-600 disabled:opacity-30"><Plus size={16} /></button>
+            </div>
+          </div>
+          <SeatLayoutPreview seatCount={Number(form.seat_count)} />
+        </div>
         <SubmitButton saving={saving} label={item ? 'Save bus' : 'Add bus'} />
       </form>
     </Editor>
+  )
+}
+
+function SeatLayoutPreview({ seatCount }) {
+  const rows = Array.from({ length: seatCount / 4 }, (_, index) => index + 1)
+  return (
+    <div className="mt-5 max-h-72 overflow-y-auto rounded-[2rem] border-2 border-stone-300 bg-stone-100 p-4" aria-label={`${seatCount} seat bus layout preview`}>
+      <div className="mb-4 flex items-center justify-between border-b border-stone-300 pb-3 text-[10px] font-bold tracking-wider text-stone-400 uppercase"><span>2 + 2 layout</span><span>Front</span></div>
+      <div className="mx-auto grid max-w-64 grid-cols-[1fr_1fr_1.25rem_1fr_1fr] gap-2">
+        {rows.flatMap((row) => [1, 2, 3, 4].map((seat) => (
+          <span key={`${row}-${seat}`} style={{ gridColumn: seat > 2 ? seat + 1 : seat }} className="flex aspect-square items-center justify-center rounded-lg border border-moss/30 bg-white text-[10px] font-bold text-moss" title={`Seat ${String.fromCharCode(64 + row)}${seat}`}>
+            <Armchair size={14} aria-hidden="true" />
+          </span>
+        )))}
+      </div>
+    </div>
   )
 }
 
