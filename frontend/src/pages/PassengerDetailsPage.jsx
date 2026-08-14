@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ArrowLeft, Clock3, CreditCard, ExternalLink, TicketCheck } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock3, CreditCard, ExternalLink, TicketCheck } from 'lucide-react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 
 import { confirmCounterBooking, getBooking, initiateEsewaPayment, savePassengerDetails } from '../api/bookings.js'
@@ -23,6 +23,7 @@ function PassengerForm({ booking }) {
   const navigate = useNavigate()
   const remainingSeconds = useCountdown(booking.hold_expires_at)
   const [redirecting, setRedirecting] = useState(false)
+  const [counterBookingConfirmed, setCounterBookingConfirmed] = useState(false)
   const [validationError, setValidationError] = useState('')
   const [passengers, setPassengers] = useState(() => booking.seats.map((seat) => ({
     seat_code: seat.seat_code,
@@ -57,9 +58,20 @@ function PassengerForm({ booking }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['booking', booking.booking_reference] })
       queryClient.invalidateQueries({ queryKey: ['bookings'] })
-      navigate(`/bookings/${booking.booking_reference}/confirmed`)
+      setCounterBookingConfirmed(true)
     },
   })
+
+  useEffect(() => {
+    if (!counterBookingConfirmed) return undefined
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') navigate(`/bookings/${booking.booking_reference}/confirmed`)
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [booking.booking_reference, counterBookingConfirmed, navigate])
 
   function updatePassenger(index, field, value) {
     setValidationError('')
@@ -143,6 +155,35 @@ function PassengerForm({ booking }) {
           {(validationError || apiError) && <div className="mt-6 flex gap-3 text-sm font-semibold text-red-700" role="alert"><AlertTriangle size={18} className="shrink-0" /><p>{validationError || apiError.detail || 'The booking could not be completed.'}</p></div>}
           <div className="mt-8 flex justify-end"><button disabled={submitting} className="rounded-full bg-[#38852b] px-7 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50">{paymentMutation.isPending ? 'Preparing eSewa…' : `Pay ${formatCurrency(booking.total_amount)} with eSewa`}</button></div>
         </form>
+      )}
+
+      {counterBookingConfirmed && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/60 px-5 py-8 backdrop-blur-sm" role="presentation">
+          <section
+            aria-describedby="counter-booking-message"
+            aria-labelledby="counter-booking-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl sm:p-9"
+            role="dialog"
+          >
+            <span className="grid size-14 place-items-center rounded-full bg-[#e8f5e5] text-[#38852b]">
+              <CheckCircle2 size={28} aria-hidden="true" />
+            </span>
+            <p className="mt-6 text-xs font-bold tracking-[0.16em] text-[#38852b] uppercase">Seat hold confirmed</p>
+            <h2 id="counter-booking-title" className="mt-2 font-display text-3xl text-ink">Your seats have been held</h2>
+            <p id="counter-booking-message" className="mt-4 leading-7 text-stone-600">
+              Please pay {formatCurrency(booking.total_amount)} at the counter. Our team will contact you soon to confirm your booking.
+            </p>
+            <button
+              type="button"
+              autoFocus
+              className="mt-7 w-full rounded-full bg-ink px-6 py-3.5 font-bold text-white transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              onClick={() => navigate(`/bookings/${booking.booking_reference}/confirmed`)}
+            >
+              View booking
+            </button>
+          </section>
+        </div>
       )}
     </main>
   )
