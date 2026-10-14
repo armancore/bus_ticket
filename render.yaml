@@ -2,11 +2,8 @@
 # Service names decide the public URLs. If Render appends a suffix because a name
 # is taken, update the URL-based values marked "URL" below and the frontend rewrite.
 
-databases:
-  - name: sajilo-bus-db
-    plan: free
-    databaseName: bus_ticket
-    user: bus_ticket
+# The database is hosted on Supabase, not Render. Render asks for DATABASE_URL
+# when the Blueprint is first applied; paste Supabase's Session pooler string.
 
 envVarGroups:
   # Shared by the API and the cron job so both run with identical settings.
@@ -51,6 +48,7 @@ services:
   - type: web
     name: sajilo-bus-api
     runtime: python
+    region: singapore
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
@@ -58,10 +56,9 @@ services:
     startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
     envVars:
       - fromGroup: sajilo-bus-backend
+      # Supabase Session pooler URL (IPv4, port 5432) ending in ?sslmode=require.
       - key: DATABASE_URL
-        fromDatabase:
-          name: sajilo-bus-db
-          property: connectionString
+        sync: false
 
   - type: web
     name: sajilo-bus
@@ -90,6 +87,7 @@ services:
   - type: cron
     name: sajilo-bus-maintenance
     runtime: python
+    region: singapore
     plan: starter
     rootDir: backend
     schedule: "*/5 * * * *"
@@ -97,7 +95,6 @@ services:
     startCommand: python manage.py expire_holds && python manage.py reconcile_esewa
     envVars:
       - fromGroup: sajilo-bus-backend
+      # Supabase Session pooler URL (IPv4, port 5432) ending in ?sslmode=require.
       - key: DATABASE_URL
-        fromDatabase:
-          name: sajilo-bus-db
-          property: connectionString
+        sync: false

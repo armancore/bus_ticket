@@ -160,19 +160,24 @@ python manage.py reconcile_esewa
 
 ## Deploying to Render
 
-[`render.yaml`](render.yaml) describes the whole stack as a Render Blueprint:
+[`render.yaml`](render.yaml) describes the app as a Render Blueprint. PostgreSQL is hosted separately on Supabase.
 
 | Resource | Render type | Purpose |
 | --- | --- | --- |
-| `sajilo-bus-db` | PostgreSQL (free) | Application database |
 | `sajilo-bus-api` | Python web service (free) | Django API, admin, and Swagger via Gunicorn and WhiteNoise |
 | `sajilo-bus` | Static site | React build; proxies `/api/*` to the API so the browser stays same-origin |
 | `sajilo-bus-maintenance` | Cron job (starter) | Runs `expire_holds` and `reconcile_esewa` every five minutes |
 
-1. Push this repository to GitHub.
-2. In Render, choose **New > Blueprint**, select the repository, and apply it.
-3. If Render gives a service a different URL than its name (for example `sajilo-bus-a1b2.onrender.com`), update the values marked `URL` in `render.yaml` and redeploy, or edit them in the `sajilo-bus-backend` environment group and the static site's redirects/rewrites.
-4. Open the API service's **Shell** and create an administrator, and optionally demo data:
+1. Create a Supabase project in the **Southeast Asia (Singapore)** region and save the database password.
+2. In Supabase, click **Connect** and copy the **Session pooler** connection string. Render cannot reach Supabase's direct connection, which is IPv6-only. Fill in the password, URL-encoding any special characters (`@` becomes `%40`), and append `?sslmode=require`:
+
+   ```text
+   postgres://postgres.<project-ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require
+   ```
+
+3. In Render, choose **New > Blueprint**, select the repository, and paste the Supabase URL when asked for `DATABASE_URL` on `sajilo-bus-api` and `sajilo-bus-maintenance`.
+4. If Render gives a service a different URL than its name (for example `sajilo-bus-a1b2.onrender.com`), update the values marked `URL` in `render.yaml` and redeploy, or edit them in the `sajilo-bus-backend` environment group and the static site's redirects/rewrites.
+5. Open the API service's **Shell** and create an administrator, and optionally demo data:
 
    ```bash
    python manage.py createsuperuser
@@ -181,7 +186,7 @@ python manage.py reconcile_esewa
 
 The site is served from `https://sajilo-bus.onrender.com`. The Django admin and API docs are at `https://sajilo-bus-api.onrender.com/admin/` and `/api/docs/`.
 
-Free-plan notes: the API sleeps after 15 idle minutes, so the first request afterwards takes up to a minute, and the free database expires after 30 days unless it is upgraded. Migrations run when the API starts because the free plan has no pre-deploy command.
+Free-plan notes: the API sleeps after 15 idle minutes, so the first request afterwards takes up to a minute, and Supabase pauses a free project after a week without activity; restore it from the Supabase dashboard. Migrations run when the API starts because the free plan has no pre-deploy command.
 
 ## Data model
 
