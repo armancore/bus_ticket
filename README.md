@@ -160,13 +160,12 @@ python manage.py reconcile_esewa
 
 ## Deploying to Render
 
-[`render.yaml`](render.yaml) describes the app as a Render Blueprint. PostgreSQL is hosted separately on Supabase.
+[`render.yaml`](render.yaml) describes the app as a Render Blueprint. PostgreSQL is hosted separately on Supabase, and every Render service uses the free plan.
 
 | Resource | Render type | Purpose |
 | --- | --- | --- |
 | `sajilo-bus-api` | Python web service (free) | Django API, admin, and Swagger via Gunicorn and WhiteNoise |
 | `sajilo-bus` | Static site | React build; proxies `/api/*` to the API so the browser stays same-origin |
-| `sajilo-bus-maintenance` | Cron job (starter) | Runs `expire_holds` and `reconcile_esewa` every five minutes |
 
 1. Create a Supabase project in the **Southeast Asia (Singapore)** region and save the database password.
 2. In Supabase, click **Connect** and copy the **Session pooler** connection string. Render cannot reach Supabase's direct connection, which is IPv6-only. Fill in the password, URL-encoding any special characters (`@` becomes `%40`), and append `?sslmode=require`:
@@ -175,9 +174,10 @@ python manage.py reconcile_esewa
    postgres://postgres.<project-ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require
    ```
 
-3. In Render, choose **New > Blueprint**, select the repository, and paste the Supabase URL when asked for `DATABASE_URL` on `sajilo-bus-api` and `sajilo-bus-maintenance`.
+3. In Render, choose **New > Blueprint**, select the repository, and paste the Supabase URL when asked for `DATABASE_URL` on `sajilo-bus-api`.
 4. If Render gives a service a different URL than its name (for example `sajilo-bus-a1b2.onrender.com`), update the values marked `URL` in `render.yaml` and redeploy, or edit them in the `sajilo-bus-backend` environment group and the static site's redirects/rewrites.
-5. Open the API service's **Shell** and create an administrator, and optionally demo data:
+5. In GitHub, add the same URL as the repository secret `DATABASE_URL` (**Settings > Secrets and variables > Actions**). The [Maintenance workflow](.github/workflows/maintenance.yml) then runs `expire_holds` and `reconcile_esewa` every ten minutes for free.
+6. Open the API service's **Shell** and create an administrator, and optionally demo data:
 
    ```bash
    python manage.py createsuperuser

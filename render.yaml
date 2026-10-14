@@ -6,7 +6,7 @@
 # when the Blueprint is first applied; paste Supabase's Session pooler string.
 
 envVarGroups:
-  # Shared by the API and the cron job so both run with identical settings.
+  # Shared settings for the API service. with identical settings.
   - name: sajilo-bus-backend
     envVars:
       - key: PYTHON_VERSION
@@ -82,19 +82,5 @@ services:
         source: /*
         destination: /index.html
 
-  # Releases expired seat holds and settles eSewa payments left pending.
-  # Render cron jobs are paid (starter plan, billed per minute of runtime).
-  - type: cron
-    name: sajilo-bus-maintenance
-    runtime: python
-    region: singapore
-    plan: starter
-    rootDir: backend
-    schedule: "*/5 * * * *"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python manage.py expire_holds && python manage.py reconcile_esewa
-    envVars:
-      - fromGroup: sajilo-bus-backend
-      # Supabase Session pooler URL (IPv4, port 5432) ending in ?sslmode=require.
-      - key: DATABASE_URL
-        sync: false
+# Scheduled maintenance (expire_holds, reconcile_esewa) runs free on GitHub Actions:
+# see .github/workflows/maintenance.yml.

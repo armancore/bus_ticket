@@ -1,0 +1,39 @@
+# Runs the backend maintenance commands on a schedule, replacing a paid Render cron job.
+# Requires the repository secret DATABASE_URL (the Supabase session pooler URL).
+name: Maintenance
+
+on:
+  schedule:
+    # GitHub may delay scheduled runs by several minutes under load.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DEBUG: "False"
+      # The commands sign nothing, so a throwaway key per run is enough.
+      SECRET_KEY: maintenance-${{ github.run_id }}-${{ github.run_attempt }}
+      # eSewa settings fall back to the UAT sandbox; add secrets here for live keys.
+      ESEWA_PRODUCT_CODE: ${{ secrets.ESEWA_PRODUCT_CODE || 'EPAYTEST' }}
+      ESEWA_STATUS_URL: ${{ secrets.ESEWA_STATUS_URL || 'https://rc.esewa.com.np/api/epay/transaction/status/' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python manage.py expire_holds
+      - run: python manage.py reconcile_esewa
