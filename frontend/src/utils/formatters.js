@@ -37,3 +37,11 @@ export function tomorrowISO() {
   tomorrow.setDate(tomorrow.getDate() + 1)
   return tomorrow.toLocaleDateString('en-CA')
 }
+
+export function formatShortDate(value) {
+  return new Intl.DateTimeFormat('en-NP', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value))
+}
