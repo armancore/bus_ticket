@@ -1,0 +1,103 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Service names decide the public URLs. If Render appends a suffix because a name
+# is taken, update the URL-based values marked "URL" below and the frontend rewrite.
+
+databases:
+  - name: sajilo-bus-db
+    plan: free
+    databaseName: bus_ticket
+    user: bus_ticket
+
+envVarGroups:
+  # Shared by the API and the cron job so both run with identical settings.
+  - name: sajilo-bus-backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      # URL: the frontend host, because API requests arrive through its rewrite.
+      - key: ALLOWED_HOSTS
+        value: sajilo-bus.onrender.com,localhost
+      # URL
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://sajilo-bus.onrender.com
+      # URL
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://sajilo-bus.onrender.com,https://sajilo-bus-api.onrender.com
+      # URL
+      - key: FRONTEND_BASE_URL
+        value: https://sajilo-bus.onrender.com
+      # URL: eSewa redirects here, so these must be public HTTPS addresses.
+      - key: ESEWA_SUCCESS_URL
+        value: https://sajilo-bus.onrender.com/api/payments/esewa/success/
+      - key: ESEWA_FAILURE_URL
+        value: https://sajilo-bus.onrender.com/api/payments/esewa/failure/
+      # eSewa UAT sandbox. Swap for live merchant values in the dashboard, not here.
+      - key: ESEWA_PRODUCT_CODE
+        value: EPAYTEST
+      - key: ESEWA_SECRET
+        value: 8gBm/:&EnhH.1/q
+      - key: ESEWA_FORM_URL
+        value: https://rc-epay.esewa.com.np/api/epay/main/v2/form
+      - key: ESEWA_STATUS_URL
+        value: https://rc.esewa.com.np/api/epay/transaction/status/
+      - key: BOOKING_HOLD_MINUTES
+        value: "10"
+
+services:
+  - type: web
+    name: sajilo-bus-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # Migrations run on start because the free plan has no pre-deploy step.
+    startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    envVars:
+      - fromGroup: sajilo-bus-backend
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sajilo-bus-db
+          property: connectionString
+
+  - type: web
+    name: sajilo-bus
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_URL
+        value: /api
+    routes:
+      # Same-origin API: the browser calls /api and Render proxies it to Django.
+      # URL
+      - type: rewrite
+        source: /api/*
+        destination: https://sajilo-bus-api.onrender.com/api/*
+      # Client-side routing: unknown paths load the React app.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # Releases expired seat holds and settles eSewa payments left pending.
+  # Render cron jobs are paid (starter plan, billed per minute of runtime).
+  - type: cron
+    name: sajilo-bus-maintenance
+    runtime: python
+    plan: starter
+    rootDir: backend
+    schedule: "*/5 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py expire_holds && python manage.py reconcile_esewa
+    envVars:
+      - fromGroup: sajilo-bus-backend
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sajilo-bus-db
+          property: connectionString
