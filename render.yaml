@@ -1,12 +1,12 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
 # Service names decide the public URLs. If Render appends a suffix because a name
-# is taken, update the URL-based values marked "URL" below and the frontend rewrite.
+# is taken, update the values marked "URL" below and the rewrite in frontend/vercel.json.
 
 # The database is hosted on Supabase, not Render. Render asks for DATABASE_URL
 # when the Blueprint is first applied; paste Supabase's Session pooler string.
 
 envVarGroups:
-  # Shared settings for the API service. with identical settings.
+  # Settings for the API service.
   - name: sajilo-bus-backend
     envVars:
       - key: PYTHON_VERSION
@@ -15,23 +15,23 @@ envVarGroups:
         value: "False"
       - key: SECRET_KEY
         generateValue: true
-      # URL: the frontend host, because API requests arrive through its rewrite.
+      # URL: the Vercel host, because API requests arrive through its rewrite.
       - key: ALLOWED_HOSTS
-        value: sajilo-bus.onrender.com,localhost
+        value: sajilo-bus.vercel.app,localhost
       # URL
       - key: CORS_ALLOWED_ORIGINS
-        value: https://sajilo-bus.onrender.com
+        value: https://sajilo-bus.vercel.app
       # URL
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://sajilo-bus.onrender.com,https://sajilo-bus-api.onrender.com
+        value: https://sajilo-bus.vercel.app,https://sajilo-bus-api.onrender.com
       # URL
       - key: FRONTEND_BASE_URL
-        value: https://sajilo-bus.onrender.com
+        value: https://sajilo-bus.vercel.app
       # URL: eSewa redirects here, so these must be public HTTPS addresses.
       - key: ESEWA_SUCCESS_URL
-        value: https://sajilo-bus.onrender.com/api/payments/esewa/success/
+        value: https://sajilo-bus.vercel.app/api/payments/esewa/success/
       - key: ESEWA_FAILURE_URL
-        value: https://sajilo-bus.onrender.com/api/payments/esewa/failure/
+        value: https://sajilo-bus.vercel.app/api/payments/esewa/failure/
       # eSewa UAT sandbox. Swap for live merchant values in the dashboard, not here.
       - key: ESEWA_PRODUCT_CODE
         value: EPAYTEST
@@ -60,27 +60,6 @@ services:
       - key: DATABASE_URL
         sync: false
 
-  - type: web
-    name: sajilo-bus
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: VITE_API_URL
-        value: /api
-    routes:
-      # Same-origin API: the browser calls /api and Render proxies it to Django.
-      # URL
-      - type: rewrite
-        source: /api/*
-        destination: https://sajilo-bus-api.onrender.com/api/*
-      # Client-side routing: unknown paths load the React app.
-      - type: rewrite
-        source: /*
-        destination: /index.html
-
+# The React frontend is deployed on Vercel: see frontend/vercel.json.
 # Scheduled maintenance (expire_holds, reconcile_esewa) runs free on GitHub Actions:
 # see .github/workflows/maintenance.yml.

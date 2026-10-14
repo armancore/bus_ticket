@@ -158,14 +158,16 @@ python manage.py reconcile_esewa
 
 `reconcile_esewa` checks attempts that remain initiated or pending for more than five minutes. In a hosted environment it should run on a schedule such as cron.
 
-## Deploying to Render
+## Deploying
 
-[`render.yaml`](render.yaml) describes the app as a Render Blueprint. PostgreSQL is hosted separately on Supabase, and every Render service uses the free plan.
+The API runs on Render, the React frontend on Vercel, and PostgreSQL on Supabase. Every piece uses a free plan.
 
-| Resource | Render type | Purpose |
+| Piece | Host | Config |
 | --- | --- | --- |
-| `sajilo-bus-api` | Python web service (free) | Django API, admin, and Swagger via Gunicorn and WhiteNoise |
-| `sajilo-bus` | Static site | React build; proxies `/api/*` to the API so the browser stays same-origin |
+| Django API, admin, and Swagger (Gunicorn and WhiteNoise) | Render web service `sajilo-bus-api` | [`render.yaml`](render.yaml) |
+| React frontend; proxies `/api/*` to the API so the browser stays same-origin | Vercel project `sajilo-bus` | [`frontend/vercel.json`](frontend/vercel.json) |
+| PostgreSQL | Supabase | `DATABASE_URL` |
+| `expire_holds` and `reconcile_esewa` every ten minutes | GitHub Actions | [`maintenance.yml`](.github/workflows/maintenance.yml) |
 
 1. Create a Supabase project in the **Southeast Asia (Singapore)** region and save the database password.
 2. In Supabase, click **Connect** and copy the **Session pooler** connection string. Render cannot reach Supabase's direct connection, which is IPv6-only. Fill in the password, URL-encoding any special characters (`@` becomes `%40`), and append `?sslmode=require`:
@@ -174,17 +176,18 @@ python manage.py reconcile_esewa
    postgres://postgres.<project-ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require
    ```
 
-3. In Render, choose **New > Blueprint**, select the repository, and paste the Supabase URL when asked for `DATABASE_URL` on `sajilo-bus-api`.
-4. If Render gives a service a different URL than its name (for example `sajilo-bus-a1b2.onrender.com`), update the values marked `URL` in `render.yaml` and redeploy, or edit them in the `sajilo-bus-backend` environment group and the static site's redirects/rewrites.
-5. In GitHub, add the same URL as the repository secret `DATABASE_URL` (**Settings > Secrets and variables > Actions**). The [Maintenance workflow](.github/workflows/maintenance.yml) then runs `expire_holds` and `reconcile_esewa` every ten minutes for free.
-6. Open the API service's **Shell** and create an administrator, and optionally demo data:
+3. In Render, choose **New > Blueprint**, select the repository, and paste the Supabase URL when asked for `DATABASE_URL`.
+4. In Vercel, import the repository as a project named `sajilo-bus` with **Root Directory** set to `frontend`. Vercel detects Vite and needs no environment variables.
+5. If either host gives a different URL than `sajilo-bus-api.onrender.com` or `sajilo-bus.vercel.app`, update the values marked `URL` in `render.yaml` and the rewrite in `frontend/vercel.json`, then push.
+6. In GitHub, add the same Supabase URL as the repository secret `DATABASE_URL` (**Settings > Secrets and variables > Actions**) so the maintenance workflow can run.
+7. Open the API service's **Shell** in Render and create an administrator, and optionally demo data:
 
    ```bash
    python manage.py createsuperuser
    python manage.py seed_data
    ```
 
-The site is served from `https://sajilo-bus.onrender.com`. The Django admin and API docs are at `https://sajilo-bus-api.onrender.com/admin/` and `/api/docs/`.
+The site is served from `https://sajilo-bus.vercel.app`. The Django admin and API docs are at `https://sajilo-bus-api.onrender.com/admin/` and `/api/docs/`.
 
 Free-plan notes: the API sleeps after 15 idle minutes, so the first request afterwards takes up to a minute, and Supabase pauses a free project after a week without activity; restore it from the Supabase dashboard. Migrations run when the API starts because the free plan has no pre-deploy command.
 
