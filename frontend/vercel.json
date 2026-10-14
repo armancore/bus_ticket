@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://sajilo-bus-api.onrender.com/api/$1"
+      "destination": "https://sajilo-bus-api-4zmo.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",

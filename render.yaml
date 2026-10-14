@@ -23,7 +23,7 @@ envVarGroups:
         value: https://sajilo-bus-neon.vercel.app
       # URL
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://sajilo-bus-neon.vercel.app,https://sajilo-bus-api.onrender.com
+        value: https://sajilo-bus-neon.vercel.app,https://sajilo-bus-api-4zmo.onrender.com
       # URL
       - key: FRONTEND_BASE_URL
         value: https://sajilo-bus-neon.vercel.app
