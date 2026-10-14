@@ -28,6 +28,11 @@ jobs:
       ESEWA_PRODUCT_CODE: ${{ secrets.ESEWA_PRODUCT_CODE || 'EPAYTEST' }}
       ESEWA_STATUS_URL: ${{ secrets.ESEWA_STATUS_URL || 'https://rc.esewa.com.np/api/epay/transaction/status/' }}
     steps:
+      # Hitting the API through Vercel keeps the free Render instance from sleeping
+      # (it idles out after 15 minutes) and checks the whole request path.
+      - name: Keep API awake
+        working-directory: .
+        run: curl -fsS -o /dev/null -m 120 --retry 2 https://sajilo-bus-neon.vercel.app/api/routes/
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
