@@ -180,12 +180,16 @@ The API runs on Render, the React frontend on Vercel, and PostgreSQL on Supabase
 4. In Vercel, import the repository as a project named `sajilo-bus` with **Root Directory** set to `frontend`. Vercel detects Vite and needs no environment variables.
 5. If either host gives a different URL than `sajilo-bus-api-4zmo.onrender.com` or `sajilo-bus-neon.vercel.app`, update the values marked `URL` in `render.yaml` and the rewrite in `frontend/vercel.json`, then push.
 6. In GitHub, add the same Supabase URL as the repository secret `DATABASE_URL` (**Settings > Secrets and variables > Actions**) so the maintenance workflow can run.
-7. Open the API service's **Shell** in Render and create an administrator, and optionally demo data:
+7. Render's shell is a paid feature, so create the administrator, and optionally demo data, from your own machine against Supabase. In PowerShell from the repository root:
 
-   ```bash
-   python manage.py createsuperuser
-   python manage.py seed_data
+   ```powershell
+   $env:DATABASE_URL = "<the Supabase URL from step 2>"
+   .venv\Scripts\python backend\manage.py createsuperuser
+   .venv\Scripts\python backend\manage.py seed_data
+   Remove-Item Env:DATABASE_URL
    ```
+
+   `DATABASE_URL` takes priority over the `DB_*` values in `backend/.env` for that terminal only. Migrations are not needed here because the API applies them on startup. Skip `seed_data` if the public demo accounts should not exist on the live site.
 
 The site is served from `https://sajilo-bus-neon.vercel.app`. The Django admin and API docs are at `https://sajilo-bus-api-4zmo.onrender.com/admin/` and `/api/docs/`.
 
