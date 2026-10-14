@@ -17,21 +17,21 @@ envVarGroups:
         generateValue: true
       # URL: the Vercel host, because API requests arrive through its rewrite.
       - key: ALLOWED_HOSTS
-        value: sajilo-bus.vercel.app,localhost
+        value: sajilo-bus-neon.vercel.app,localhost
       # URL
       - key: CORS_ALLOWED_ORIGINS
-        value: https://sajilo-bus.vercel.app
+        value: https://sajilo-bus-neon.vercel.app
       # URL
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://sajilo-bus.vercel.app,https://sajilo-bus-api.onrender.com
+        value: https://sajilo-bus-neon.vercel.app,https://sajilo-bus-api.onrender.com
       # URL
       - key: FRONTEND_BASE_URL
-        value: https://sajilo-bus.vercel.app
+        value: https://sajilo-bus-neon.vercel.app
       # URL: eSewa redirects here, so these must be public HTTPS addresses.
       - key: ESEWA_SUCCESS_URL
-        value: https://sajilo-bus.vercel.app/api/payments/esewa/success/
+        value: https://sajilo-bus-neon.vercel.app/api/payments/esewa/success/
       - key: ESEWA_FAILURE_URL
-        value: https://sajilo-bus.vercel.app/api/payments/esewa/failure/
+        value: https://sajilo-bus-neon.vercel.app/api/payments/esewa/failure/
       # eSewa UAT sandbox. Swap for live merchant values in the dashboard, not here.
       - key: ESEWA_PRODUCT_CODE
         value: EPAYTEST

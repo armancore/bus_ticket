@@ -178,7 +178,7 @@ The API runs on Render, the React frontend on Vercel, and PostgreSQL on Supabase
 
 3. In Render, choose **New > Blueprint**, select the repository, and paste the Supabase URL when asked for `DATABASE_URL`.
 4. In Vercel, import the repository as a project named `sajilo-bus` with **Root Directory** set to `frontend`. Vercel detects Vite and needs no environment variables.
-5. If either host gives a different URL than `sajilo-bus-api.onrender.com` or `sajilo-bus.vercel.app`, update the values marked `URL` in `render.yaml` and the rewrite in `frontend/vercel.json`, then push.
+5. If either host gives a different URL than `sajilo-bus-api.onrender.com` or `sajilo-bus-neon.vercel.app`, update the values marked `URL` in `render.yaml` and the rewrite in `frontend/vercel.json`, then push.
 6. In GitHub, add the same Supabase URL as the repository secret `DATABASE_URL` (**Settings > Secrets and variables > Actions**) so the maintenance workflow can run.
 7. Open the API service's **Shell** in Render and create an administrator, and optionally demo data:
 
@@ -187,7 +187,7 @@ The API runs on Render, the React frontend on Vercel, and PostgreSQL on Supabase
    python manage.py seed_data
    ```
 
-The site is served from `https://sajilo-bus.vercel.app`. The Django admin and API docs are at `https://sajilo-bus-api.onrender.com/admin/` and `/api/docs/`.
+The site is served from `https://sajilo-bus-neon.vercel.app`. The Django admin and API docs are at `https://sajilo-bus-api.onrender.com/admin/` and `/api/docs/`.
 
 Free-plan notes: the API sleeps after 15 idle minutes, so the first request afterwards takes up to a minute, and Supabase pauses a free project after a week without activity; restore it from the Supabase dashboard. Migrations run when the API starts because the free plan has no pre-deploy command.
 
