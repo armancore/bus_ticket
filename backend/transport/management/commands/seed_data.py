@@ -35,7 +35,7 @@ def make_layout(rows, left_columns=2, right_columns=2):
 
 
 class Command(BaseCommand):
-    help = "Create demo users, a bus, routes, and trips for today and tomorrow."
+    help = "Create demo users, a bus, routes, and trips for the next week."
 
     def handle(self, *args, **options):
         operator, _ = User.objects.update_or_create(

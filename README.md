@@ -156,7 +156,7 @@ python manage.py expire_holds
 python manage.py reconcile_esewa
 ```
 
-`ensure_daily_trips` keeps the demo bus scheduled on both demo routes today and tomorrow, at five departures spread through the day. It only adds missing trips, so operator edits and cancellations are kept, and it does nothing until `seed_data` has created the demo bus.
+`ensure_daily_trips` keeps the demo bus scheduled on both demo routes for the next seven days, starting today, at five departures spread through the day. It only adds missing trips, so operator edits and cancellations are kept, and it does nothing until `seed_data` has created the demo bus.
 
 `reconcile_esewa` checks attempts that remain initiated or pending for more than five minutes. In a hosted environment it should run on a schedule such as cron.
 

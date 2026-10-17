@@ -9,6 +9,8 @@ from transport.models import Bus, Route, Trip
 
 
 DEMO_BUS_PLATE = "BA-2-KHA-2026"
+# Covers any date a visitor is likely to pick in the coming week.
+DAYS_AHEAD = 7
 # Spread through the day so a visitor finds an upcoming bus at almost any hour.
 DEPARTURE_TIMES = [time(6, 30), time(10, 0), time(13, 30), time(17, 0), time(20, 30)]
 ROUTE_FARES = {
@@ -17,7 +19,7 @@ ROUTE_FARES = {
 }
 
 
-def ensure_daily_trips(days=2):
+def ensure_daily_trips(days=DAYS_AHEAD):
     """Create any missing demo trips from today through the next `days - 1` days.
 
     Existing trips are left untouched, so an operator's cancellation or fare
@@ -55,7 +57,7 @@ def ensure_daily_trips(days=2):
 
 
 class Command(BaseCommand):
-    help = "Make sure the demo bus has trips scheduled for today and tomorrow."
+    help = "Make sure the demo bus has trips scheduled for the next week."
 
     def handle(self, *args, **options):
         created = ensure_daily_trips()
