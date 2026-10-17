@@ -156,6 +156,8 @@ python manage.py expire_holds
 python manage.py reconcile_esewa
 ```
 
+`ensure_daily_trips` keeps the demo bus scheduled on both demo routes today and tomorrow, at five departures spread through the day. It only adds missing trips, so operator edits and cancellations are kept, and it does nothing until `seed_data` has created the demo bus.
+
 `reconcile_esewa` checks attempts that remain initiated or pending for more than five minutes. In a hosted environment it should run on a schedule such as cron.
 
 ## Deploying
@@ -167,7 +169,7 @@ The API runs on Render, the React frontend on Vercel, and PostgreSQL on Supabase
 | Django API, admin, and Swagger (Gunicorn and WhiteNoise) | Render web service `sajilo-bus-api` | [`render.yaml`](render.yaml) |
 | React frontend; proxies `/api/*` to the API so the browser stays same-origin | Vercel project `sajilo-bus` | [`frontend/vercel.json`](frontend/vercel.json) |
 | PostgreSQL | Supabase | `DATABASE_URL` |
-| `expire_holds` and `reconcile_esewa` every ten minutes | GitHub Actions | [`maintenance.yml`](.github/workflows/maintenance.yml) |
+| `expire_holds`, `reconcile_esewa`, and `ensure_daily_trips` every ten minutes | GitHub Actions | [`maintenance.yml`](.github/workflows/maintenance.yml) |
 
 1. Create a Supabase project in the **Southeast Asia (Singapore)** region and save the database password.
 2. In Supabase, click **Connect** and copy the **Session pooler** connection string. Render cannot reach Supabase's direct connection, which is IPv6-only. Fill in the password, URL-encoding any special characters (`@` becomes `%40`), and append `?sslmode=require`:

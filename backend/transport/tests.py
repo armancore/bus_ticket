@@ -1,14 +1,17 @@
 from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from .management.commands.ensure_daily_trips import DEPARTURE_TIMES, ROUTE_FARES
 from .models import Bus, Route, Trip, TripSeat
 
 
@@ -387,3 +390,31 @@ class OperatorPermissionAPITests(APITestCase):
             self.client.get(reverse("operator-trip-list")).status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
+
+class DailyTripsCommandTests(TestCase):
+    def test_seed_and_ensure_keep_today_and_tomorrow_scheduled(self):
+        call_command("seed_data", stdout=StringIO())
+        today = timezone.localdate()
+        trips = Trip.objects.all()
+        expected = 2 * len(DEPARTURE_TIMES) * len(ROUTE_FARES)
+        self.assertEqual(trips.count(), expected)
+        self.assertEqual(
+            {timezone.localtime(trip.departure_datetime).date() for trip in trips},
+            {today, today + timedelta(days=1)},
+        )
+
+        cancelled = trips.first()
+        cancelled.status = Trip.Status.CANCELLED
+        cancelled.save()
+        call_command("ensure_daily_trips", stdout=StringIO())
+
+        self.assertEqual(Trip.objects.count(), expected)
+        cancelled.refresh_from_db()
+        self.assertEqual(cancelled.status, Trip.Status.CANCELLED)
+
+    def test_ensure_without_demo_bus_does_nothing(self):
+        out = StringIO()
+        call_command("ensure_daily_trips", stdout=out)
+        self.assertFalse(Trip.objects.exists())
+        self.assertIn("Nothing to do", out.getvalue())
